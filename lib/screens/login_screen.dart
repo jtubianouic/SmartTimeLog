@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../widgets/theme_toggle_button.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -67,66 +68,67 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'Track your work hours effortlessly',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF6B7280),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 48.0),
 
-                // Username Field
-                TextField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    hintText: 'Username',
-                    prefixIcon: Icon(Icons.person_outline),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Username',
+                    style: ShadTheme.of(context).textTheme.small.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
+                ),
+                const SizedBox(height: 8.0),
+                ShadInput(
+                  controller: _usernameController,
+                  placeholder: const Text('Enter your username'),
+                  leading: const Icon(Icons.person_outline, size: 18),
                 ),
                 const SizedBox(height: 16.0),
 
-                // Password Field
-                TextField(
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Password',
+                    style: ShadTheme.of(context).textTheme.small.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                ShadInput(
                   controller: _passwordController,
+                  placeholder: const Text('Enter your password'),
                   obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
+                  leading: const Icon(Icons.lock_outline, size: 18),
+                  trailing: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 18,
                     ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
                   ),
                 ),
                 const SizedBox(height: 12.0),
 
                 const SizedBox(height: 24.0),
 
-                // Login Button
                 SizedBox(
                   width: double.infinity,
                   height: 56,
-                  child: ElevatedButton(
+                  child: ShadButton(
                     onPressed: _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Log In',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: const Text('Log In'),
                   ),
                 ),
                 const SizedBox(height: 16.0),

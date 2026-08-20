@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'dart:async';
 import '../theme/app_theme.dart';
 
@@ -48,6 +49,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
   void _handleClockOut() {
     Navigator.pushReplacementNamed(context, '/clockout');
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -99,9 +101,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkStatusSuccessBackground
-                          : AppTheme.lightStatusSuccessBackground,
+                        color: AppTheme.successBackground(context),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -110,9 +110,9 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white,
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black.withValues(alpha: 0.5),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -120,7 +120,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                           'Clocked In',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white,
+                                    color:  Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black.withValues(alpha: 0.5),
                                     fontWeight: FontWeight.w600,
                                   ),
                         ),
@@ -195,7 +195,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                             'Clocked in',
                             '09:00 AM',
                             Icons.access_time,
-                            Colors.blue,
+                            Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -205,7 +205,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                             'Location',
                             'In Office',
                             Icons.location_on,
-                            Colors.green,
+                            AppTheme.successBorder(context),
                           ),
                         ),
                       ],
@@ -218,10 +218,13 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: _isOnBreak ? Colors.orange[50] : Colors.blue[50],
+                        color: _isOnBreak
+                            ? AppTheme.warningBackground(context)
+                            : AppTheme.mutedSurface(context),
                         border: Border.all(
-                          color:
-                              _isOnBreak ? Colors.orange[300]! : Colors.blue[300]!,
+                          color: _isOnBreak
+                              ? AppTheme.warningBorder(context)
+                              : Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       child: Row(
@@ -231,15 +234,15 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                             height: 56,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _isOnBreak
-                                  ? Colors.orange[200]
-                                  : Colors.blue[200],
+                                color: _isOnBreak
+                                  ? AppTheme.warningBorder(context)
+                                  : Theme.of(context).colorScheme.primary,
                             ),
                             child: Icon(
                               _isOnBreak ? Icons.coffee : Icons.work,
-                              color: _isOnBreak
-                                  ? Colors.amber[700]
-                                  : Colors.blue[700],
+                                color: _isOnBreak
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Theme.of(context).colorScheme.primary,
                               size: 28,
                             ),
                           ),
@@ -256,8 +259,8 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: _isOnBreak
-                                            ? Colors.orange[700]
-                                            : Colors.blue[700],
+                                          ? Theme.of(context).colorScheme.onSurface
+                                          : Theme.of(context).colorScheme.primary,
                                       ),
                                 ),
                                 const SizedBox(height: 4),
@@ -269,7 +272,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        color: Colors.grey[600],
+                                        color: AppTheme.mutedText(context),
                                       ),
                                 ),
                               ],
@@ -286,8 +289,8 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey[50],
-                        border: Border.all(color: Colors.grey[200]!),
+                        color: AppTheme.mutedSurface(context),
+                        border: Border.all(color: AppTheme.border(context)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,7 +321,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Colors.grey[200]!),
+                  top: BorderSide(color: AppTheme.border(context)),
                 ),
               ),
               child: Column(
@@ -326,25 +329,15 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: OutlinedButton(
+                    child: ShadButton.outline(
                       onPressed: _handleTakeBreak,
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: _isOnBreak
-                              ? Colors.orange
-                              : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
                       child: Text(
                         _isOnBreak ? 'Resume Work' : 'Take Break',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: _isOnBreak
-                              ? Colors.orange
+                              ? Theme.of(context).colorScheme.onSurface
                               : Theme.of(context).colorScheme.primary,
                         ),
                       ),
@@ -354,13 +347,8 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ElevatedButton(
+                    child: ShadButton(
                       onPressed: _handleClockOut,
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                       child: const Text(
                         'Clock Out',
                         style: TextStyle(
@@ -401,7 +389,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.mutedText(context),
                 ),
           ),
           const SizedBox(height: 4),
@@ -424,7 +412,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
+                color: AppTheme.mutedText(context),
               ),
         ),
         Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
 
 class GeofenceClockInScreen extends StatefulWidget {
@@ -67,10 +68,6 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                       ),
                     ],
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
                 ],
               ),
             ),
@@ -82,81 +79,15 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                 child: Column(
                   children: [
                     // Map Placeholder
-                    Container(
-                      width: double.infinity,
-                      height: 300,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkCardBackground
-                            : AppTheme.lightCardBackground,
-                        border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkCardBorder
-                              : AppTheme.lightCardBorder,
-                          width: 2,
-                        ),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Map background
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: LinearGradient(
-                                colors: [
-                                    Theme.of(context).brightness == Brightness.dark
-                                      ? AppTheme.darkSummaryGradientStart
-                                      : AppTheme.lightSummaryGradientStart,
-                                    Theme.of(context).brightness == Brightness.dark
-                                      ? AppTheme.darkCardBackground
-                                      : AppTheme.lightCardBackground,
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Center marker
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 60,
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.3),
-                                      blurRadius: 16,
-                                      spreadRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.location_on,
-                                  size: 32,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Your Location',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: Theme.of(context).brightness == Brightness.dark
-                                          ? const Color(0xFF9CA3AF)
-                                          : const Color(0xFF6B7280),
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    // MapWidget(
+                    //   // ignore: deprecated_member_use
+                    //   cameraOptions: CameraOptions(
+                    //     center: Point(
+                    //       coordinates: Position(125.6107, 7.0731),
+                    //     ),
+                    //     zoom: 12,
+                    //   ),
+                    // ),
                     const SizedBox(height: 24.0),
 
                     // Geofence Status Card
@@ -166,20 +97,12 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: _isWithinGeofence
-                          ? (Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkStatusSuccessBackground
-                            : AppTheme.lightStatusSuccessBackground)
-                          : (Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkStatusErrorBackground
-                            : AppTheme.lightStatusErrorBackground),
+                          ? AppTheme.successBackground(context)
+                          : Theme.of(context).colorScheme.errorContainer,
                         border: Border.all(
                           color: _isWithinGeofence
-                            ? (Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkStatusSuccessBorder
-                              : AppTheme.lightStatusSuccessBorder)
-                            : (Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkStatusErrorBorder
-                              : AppTheme.lightStatusErrorBorder),
+                            ? AppTheme.successBorder(context)
+                            : Theme.of(context).colorScheme.error,
                         ),
                       ),
                       child: Row(
@@ -190,12 +113,8 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                                 color: _isWithinGeofence
-                                  ? (Theme.of(context).brightness == Brightness.dark
-                                    ? AppTheme.darkStatusSuccessBorder
-                                    : AppTheme.lightStatusSuccessBorder)
-                                  : (Theme.of(context).brightness == Brightness.dark
-                                    ? AppTheme.darkStatusErrorBorder
-                                    : AppTheme.lightStatusErrorBorder),
+                                  ? AppTheme.successBorder(context)
+                                  : Theme.of(context).colorScheme.error,
                             ),
                             child: Icon(
                               _isWithinGeofence
@@ -219,7 +138,9 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                                       .titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: Theme.of(context).brightness == Brightness.dark
+                                            ? Colors.white
+                                            : Colors.black,
                                       ),
                                 ),
                                 const SizedBox(height: 4),
@@ -231,7 +152,9 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        color: Colors.white,
+                                        color: Theme.of(context).brightness == Brightness.dark
+                                            ? Colors.white.withAlpha((0.7 * 255).toInt())
+                                            : Colors.black.withAlpha((0.7 * 255).toInt()),
                                       ),
                                 ),
                               ],
@@ -248,13 +171,9 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkCardBackground
-                          : AppTheme.lightCardBackground,
+                        color: AppTheme.surface(context),
                         border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkCardBorder
-                            : AppTheme.lightCardBorder),
+                          color: AppTheme.border(context)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,23 +208,16 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
               decoration: BoxDecoration(
                 border: Border(
                     top: BorderSide(
-                      color: Theme.of(context).brightness == Brightness.dark
-                        ? AppTheme.darkCardBorder
-                        : AppTheme.lightCardBorder),
+                      color: AppTheme.border(context)),
                 ),
               ),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
-                child: ElevatedButton(
+                child: ShadButton(
                   onPressed: _isWithinGeofence && !_isLoading
                       ? _handleClockIn
                       : null,
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 24,
@@ -341,7 +253,7 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
+                color: AppTheme.mutedText(context),
               ),
         ),
         Text(

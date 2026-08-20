@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
 
 class AISummaryScreen extends StatefulWidget {
@@ -149,9 +150,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                           ],
                         ),
                         border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkCardBorder
-                            : AppTheme.lightCardBorder),
+                          color: AppTheme.border(context)),
                       ),
                       child: Column(
                         children: [
@@ -163,21 +162,21 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                                 'Total Duration',
                                 '8.25h',
                                 Icons.schedule,
-                                Colors.blue,
+                                Theme.of(context).colorScheme.primary,
                               ),
                               _buildStatCard(
                                 context,
                                 'Break Time',
                                 '15 min',
                                 Icons.coffee,
-                                Colors.orange,
+                                AppTheme.warningBorder(context),
                               ),
                               _buildStatCard(
                                 context,
                                 'Active Time',
                                 '8h 10m',
                                 Icons.trending_up,
-                                Colors.green,
+                                AppTheme.successBorder(context),
                               ),
                             ],
                           ),
@@ -199,8 +198,8 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey[50],
-                        border: Border.all(color: Colors.grey[200]!),
+                        color: AppTheme.mutedSurface(context),
+                        border: Border.all(color: AppTheme.border(context)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,11 +211,14 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                                 height: 40,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.purple.withValues(alpha: 0.1),
+                                    color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.1),
                                 ),
                                 child: Icon(
                                   Icons.auto_awesome,
-                                  color: Colors.purple[700],
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 20,
                                 ),
                               ),
@@ -240,7 +242,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          color: Colors.grey[600],
+                                          color: AppTheme.mutedText(context),
                                         ),
                                   ),
                                 ],
@@ -250,7 +252,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                           const SizedBox(height: 12.0),
                           Container(
                             height: 1,
-                            color: Colors.grey[200],
+                            color: AppTheme.border(context),
                           ),
                           const SizedBox(height: 12.0),
                           Text(
@@ -288,7 +290,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[200]!),
+                        border: Border.all(color: AppTheme.border(context)),
                       ),
                       child: Theme(
                         data: Theme.of(context).copyWith(
@@ -357,7 +359,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Colors.grey[200]!),
+                  top: BorderSide(color: AppTheme.border(context)),
                 ),
               ),
               child: Column(
@@ -365,16 +367,8 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: OutlinedButton(
+                    child: ShadButton.outline(
                       onPressed: _handleEdit,
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
                       child: Text(
                         'Edit',
                         style: TextStyle(
@@ -389,13 +383,8 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ElevatedButton(
+                    child: ShadButton(
                       onPressed: _handleConfirm,
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                       child: const Text(
                         'Confirm',
                         style: TextStyle(
@@ -437,7 +426,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
           label,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
+                color: AppTheme.mutedText(context),
               ),
         ),
       ],
@@ -462,7 +451,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
           child: Text(
             text,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[700],
+                  color: AppTheme.mutedText(context),
                   height: 1.5,
                 ),
           ),
@@ -487,14 +476,14 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
+                      color: AppTheme.mutedText(context),
                     ),
               ),
               const SizedBox(height: 4),
               Text(
                 description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[700],
+                      color: AppTheme.mutedText(context),
                     ),
               ),
             ],

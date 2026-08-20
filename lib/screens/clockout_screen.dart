@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
 
 class ClockOutScreen extends StatefulWidget {
@@ -114,13 +115,9 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkStatusSuccessBackground
-                          : AppTheme.lightStatusSuccessBackground,
+                        color: AppTheme.successBackground(context),
                         border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkStatusSuccessBorder
-                            : AppTheme.lightStatusSuccessBorder),
+                          color: AppTheme.successBorder(context)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,9 +129,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                    color: Theme.of(context).brightness == Brightness.dark
-                                      ? AppTheme.darkStatusSuccessBorder
-                                      : AppTheme.lightStatusSuccessBorder,
+                                    color: AppTheme.successBorder(context),
                                 ),
                                 child: Icon(
                                   Icons.check_circle,
@@ -154,9 +149,9 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                           .titleMedium
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).brightness == Brightness.dark
-                                              ? Colors.white
-                                              : Colors.black,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface,
                                           ),
                                     ),
                                     const SizedBox(height: 4),
@@ -166,9 +161,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                           .textTheme
                                           .bodySmall
                                           ?.copyWith(
-                                            color: Theme.of(context).brightness == Brightness.dark
-                                              ? const Color(0xFF9CA3AF)
-                                              : const Color(0xFF6B7280),
+                                            color: AppTheme.mutedText(context),
                                           ),
                                     ),
                                   ],
@@ -194,13 +187,9 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkCardBackground
-                          : AppTheme.lightCardBackground,
+                        color: AppTheme.surface(context),
                         border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark
-                            ? AppTheme.darkCardBorder
-                            : AppTheme.lightCardBorder),
+                          color: AppTheme.border(context)),
                       ),
                       child: Column(
                         children: [
@@ -212,9 +201,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                           const SizedBox(height: 12.0),
                           Container(
                             height: 1,
-                            color: Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkCardBorder
-                              : AppTheme.lightCardBorder,
+                            color: AppTheme.border(context),
                           ),
                           const SizedBox(height: 12.0),
                           _buildDetailRow(
@@ -225,9 +212,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                           const SizedBox(height: 12.0),
                           Container(
                             height: 1,
-                            color: Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkCardBorder
-                              : AppTheme.lightCardBorder,
+                            color: AppTheme.border(context),
                           ),
                           const SizedBox(height: 12.0),
                           _buildDetailRow(
@@ -292,19 +277,14 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Colors.grey[200]!),
+                  top: BorderSide(color: AppTheme.border(context)),
                 ),
               ),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
-                child: ElevatedButton(
+                child: ShadButton(
                   onPressed: _isLoading ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 24,
@@ -344,7 +324,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
+                color: AppTheme.mutedText(context),
               ),
         ),
         Text(

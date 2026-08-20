@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_notifier.dart';
 import 'screens/login_screen.dart';
@@ -31,12 +32,17 @@ class MyApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
       builder: (context, themeMode, _) {
-        return MaterialApp(
+        return ShadApp(
           title: 'SmartTimeLog',
           debugShowCheckedModeBanner: false,
           themeMode: themeMode,
-          theme: AppTheme.lightTheme(),
-          darkTheme: AppTheme.darkTheme(),
+          theme: AppTheme.lightShadTheme(),
+          darkTheme: AppTheme.darkShadTheme(),
+          materialThemeBuilder: (context, theme) {
+            return theme.brightness == Brightness.dark
+                ? AppTheme.darkTheme()
+                : AppTheme.lightTheme();
+          },
           home: const LoginScreen(),
           routes: {
             '/login': (context) => const LoginScreen(),
