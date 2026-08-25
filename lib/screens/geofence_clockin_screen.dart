@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
 
@@ -12,6 +14,7 @@ class GeofenceClockInScreen extends StatefulWidget {
 class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
   final bool _isWithinGeofence = true;
   bool _isLoading = false;
+ // Store the controller to handle camera movements or add overlays later
 
   void _handleClockIn() async {
     setState(() => _isLoading = true);
@@ -73,24 +76,73 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
             ),
 
             // Content
+           
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    // Map Placeholder
-                    // MapWidget(
-                    //   // ignore: deprecated_member_use
-                    //   cameraOptions: CameraOptions(
-                    //     center: Point(
-                    //       coordinates: Position(125.6107, 7.0731),
-                    //     ),
-                    //     zoom: 12,
-                    //   ),
-                    // ),
+                    // Map Container
+                    SizedBox(
+                      height: 250.0,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: FlutterMap(
+                          options: const MapOptions(
+                            // Centered exactly on your Location Details coordinates
+                            initialCenter: LatLng(37.7749, -122.4194), 
+                            initialZoom: 16.0, // Zoomed in closer to see the fence boundary clearly
+                          ),
+                          children: [
+                            // Layer 1: Base Map Tiles
+                            TileLayer(
+                              // OpenStreetMap tiles
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName:
+                                  'com.example.smarttimelog',
+                            ),
+                            
+                            // NEW Layer 2: Visual Geofence Boundary
+                            CircleLayer(
+                              circles: [
+                                CircleMarker(
+                                  point: const LatLng(37.7749, -122.4194),
+                                  radius: 100, // Defines the geofence radius size in METERS
+                                  useRadiusInMeter: true, // Forces calculations to match world meters
+                                  color: _isWithinGeofence
+                                      ? Colors.green.withAlpha((0.2 * 255).toInt()) // Safe translucent green
+                                      : Colors.red.withAlpha((0.15 * 255).toInt()), // Alert translucent red
+                                  borderColor: _isWithinGeofence 
+                                      ? Colors.green.withAlpha((0.8 * 255).toInt()) 
+                                      : Colors.red.withAlpha((0.8 * 255).toInt()),
+                                  borderStrokeWidth: 2.0,
+                                ),
+                              ],
+                            ),
+                            
+                            // Layer 3: Central Location Pin
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: const LatLng(37.7749, -122.4194),
+                                  width: 50,
+                                  height: 50,
+                                  child: Icon(
+                                    Icons.location_on,
+                                    color: _isWithinGeofence ? Colors.green : Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24.0),
 
-                    // Geofence Status Card
+                    // Geofence Status Card (Unchanged)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16.0),
@@ -165,7 +217,7 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                     ),
                     const SizedBox(height: 24.0),
 
-                    // Location Details
+                    // Location Details (Unchanged)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16.0),
@@ -201,7 +253,6 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                 ),
               ),
             ),
-
             // Bottom Button
             Container(
               padding: const EdgeInsets.all(16.0),

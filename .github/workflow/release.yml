@@ -1,0 +1,51 @@
+name: Build & Release Flutter APK
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers the workflow whenever you push a tag starting with 'v' (e.g., v1.0.0)
+
+jobs:
+  build:
+    name: Build and Release APK
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # Required to create a release and upload assets
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17' # Required for modern Android/Flutter builds
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          # Optional: cache: true # Speeds up future builds by caching Flutter SDK
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # Optional: Add testing steps here if needed
+      # - name: Run Tests
+      #   run: flutter test
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
