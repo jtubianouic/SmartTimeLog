@@ -28,6 +28,15 @@ jobs:
         with:
           channel: 'stable'
           # Optional: cache: true # Speeds up future builds by caching Flutter SDK
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          SUPABASE_URL=${{secrets.SUPABASE_URL}}
+          SUPABASE_PUBLISHABLE_KEY=${{secrets.SUPABASE_PUBLISHABLE_KEY}}
+          MAPBOX_TOKEN=${{secrets.MAPBOX_TOKEN}}
+          GEMINI_API_KEY=${{secrets.GEMINI_API_KEY}}
+          GROQ_API_KEY=${{secrets.GROQ_API_KEY}}
+          EOF
 
       - name: Install Dependencies
         run: flutter pub get
