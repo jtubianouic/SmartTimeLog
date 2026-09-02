@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'services/smart_time_log_api.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_notifier.dart';
 import 'screens/login_screen.dart';
@@ -13,16 +13,15 @@ import 'screens/ai_summary_screen.dart';
 Future<void> main() async {
   await dotenv.load(fileName: ".env");
 
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    publishableKey: dotenv.env['SUPABASE_PUBLISHABLE_KEY']!,
-  );
-
+  final baseUrl = dotenv.env['BASE_URL'];
+  if (baseUrl == null || baseUrl.isEmpty) {
+    throw StateError('BASE_URL is missing from .env');
+  }
+  SmartTimeLogApi.initialize(baseUrl: baseUrl);
 
   runApp(const MyApp());
 }
 
-final supabase = Supabase.instance.client;
 final themeNotifier = ThemeNotifier();
 
 class MyApp extends StatelessWidget {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'dart:async';
+import '../services/device_location_service.dart';
+import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
 
 class ActiveShiftScreen extends StatefulWidget {
@@ -14,6 +16,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
   late Timer _timer;
   int _elapsedSeconds = 0;
   bool _isOnBreak = false;
+  bool _isUpdatingBreak = false;
 
   @override
   void initState() {
@@ -42,14 +45,44 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
     return '${hours.toString().padLeft(2, '0')}h ${minutes.toString().padLeft(2, '0')}m ${secs.toString().padLeft(2, '0')}s';
   }
 
-  void _handleTakeBreak() {
-    setState(() => _isOnBreak = !_isOnBreak);
+  Future<void> _handleTakeBreak() async {
+    if (_isOnBreak) {
+      setState(() => _isOnBreak = false);
+      return;
+    }
+
+    setState(() => _isUpdatingBreak = true);
+    try {
+      final position = await DeviceLocationService.getCurrentPosition();
+      await SmartTimeLogApi.instance.takeBreak(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      if (mounted) {
+        setState(() => _isOnBreak = true);
+      }
+    } on LocationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingBreak = false);
+      }
+    }
   }
 
   void _handleClockOut() {
     Navigator.pushReplacementNamed(context, '/clockout');
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +100,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                 color: Theme.of(context).colorScheme.primary,
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -81,7 +114,8 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                     children: [
                       Text(
                         'Active Shift',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -90,8 +124,8 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                       Text(
                         'Step 3 of 5',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            ),
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
                       ),
                     ],
                   ),
@@ -101,7 +135,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                        color: AppTheme.successBackground(context),
+                      color: AppTheme.successBackground(context),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -112,17 +146,24 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black.withValues(alpha: 0.5),
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black.withValues(alpha: 0.5),
                           ),
                         ),
                         const SizedBox(width: 6),
                         Text(
                           'Clocked In',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color:  Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black.withValues(alpha: 0.5),
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black.withValues(alpha: 0.5),
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ],
                     ),
@@ -146,15 +187,16 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                         gradient: LinearGradient(
                           colors: [
                             Theme.of(context).colorScheme.primary,
-                            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                            Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.8),
                           ],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.3),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -164,17 +206,15 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                         children: [
                           Text(
                             'Total Duration',
-                            style:
-                                Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.9),
-                                    ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                ),
                           ),
                           const SizedBox(height: 16.0),
                           Text(
                             _formatTime(_elapsedSeconds),
-                            style: Theme.of(context)
-                                .textTheme
-                                .displayLarge
+                            style: Theme.of(context).textTheme.displayLarge
                                 ?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -234,13 +274,13 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                             height: 56,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                                color: _isOnBreak
+                              color: _isOnBreak
                                   ? AppTheme.warningBorder(context)
                                   : Theme.of(context).colorScheme.primary,
                             ),
                             child: Icon(
                               _isOnBreak ? Icons.coffee : Icons.work,
-                                color: _isOnBreak
+                              color: _isOnBreak
                                   ? Theme.of(context).colorScheme.onSurface
                                   : Theme.of(context).colorScheme.primary,
                               size: 28,
@@ -253,14 +293,16 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                               children: [
                                 Text(
                                   _isOnBreak ? 'On Break' : 'Working',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
+                                  style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: _isOnBreak
-                                          ? Theme.of(context).colorScheme.onSurface
-                                          : Theme.of(context).colorScheme.primary,
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
                                       ),
                                 ),
                                 const SizedBox(height: 4),
@@ -268,9 +310,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                                   _isOnBreak
                                       ? 'Break timer paused'
                                       : 'Actively working',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: AppTheme.mutedText(context),
                                       ),
@@ -297,10 +337,8 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                         children: [
                           Text(
                             'Today\'s Summary',
-                            style:
-                                Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 12.0),
                           _buildSummaryRow(context, 'Break Time', '15 min'),
@@ -330,17 +368,23 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ShadButton.outline(
-                      onPressed: _handleTakeBreak,
-                      child: Text(
-                        _isOnBreak ? 'Resume Work' : 'Take Break',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: _isOnBreak
-                              ? Theme.of(context).colorScheme.onSurface
-                              : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
+                      onPressed: _isUpdatingBreak ? null : _handleTakeBreak,
+                      child: _isUpdatingBreak
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 3),
+                            )
+                          : Text(
+                              _isOnBreak ? 'Resume Work' : 'Take Break',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _isOnBreak
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12.0),
@@ -388,17 +432,17 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
           const SizedBox(height: 12.0),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.mutedText(context),
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -411,15 +455,15 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.mutedText(context),
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
         ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
         ),
       ],
     );

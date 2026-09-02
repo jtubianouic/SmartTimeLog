@@ -3,15 +3,15 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
 
 class AISummaryScreen extends StatefulWidget {
-  const AISummaryScreen({super.key});
+  const AISummaryScreen({super.key, this.summary});
+
+  final String? summary;
 
   @override
   State<AISummaryScreen> createState() => _AISummaryScreenState();
 }
 
 class _AISummaryScreenState extends State<AISummaryScreen> {
-
-
   void _handleConfirm() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -65,9 +65,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                           children: [
                             Text(
                               'AI Summary Confirmation',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
+                              style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -76,9 +74,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Step 5 of 5',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Colors.white.withValues(alpha: 0.8),
                                   ),
@@ -93,7 +89,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                            color: Theme.of(context).brightness == Brightness.dark
+                          color: Theme.of(context).brightness == Brightness.dark
                               ? AppTheme.darkAccentPurple
                               : AppTheme.lightAccentPurple,
                           borderRadius: BorderRadius.circular(20),
@@ -109,9 +105,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                             const SizedBox(width: 6),
                             Text(
                               'AI Generated',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
@@ -142,15 +136,14 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                         gradient: LinearGradient(
                           colors: [
                             Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkSummaryGradientStart
-                              : AppTheme.lightSummaryGradientStart,
+                                ? AppTheme.darkSummaryGradientStart
+                                : AppTheme.lightSummaryGradientStart,
                             Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkSummaryGradientEnd
-                              : AppTheme.lightSummaryGradientEnd,
+                                ? AppTheme.darkSummaryGradientEnd
+                                : AppTheme.lightSummaryGradientEnd,
                           ],
                         ),
-                        border: Border.all(
-                          color: AppTheme.border(context)),
+                        border: Border.all(color: AppTheme.border(context)),
                       ),
                       child: Column(
                         children: [
@@ -189,8 +182,8 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                     Text(
                       'AI Generated Summary',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12.0),
                     Container(
@@ -211,10 +204,9 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                                 height: 40,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                    color: Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.1),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.1),
                                 ),
                                 child: Icon(
                                   Icons.auto_awesome,
@@ -231,16 +223,12 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleSmall
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     'Generated 2 minutes ago',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
                                           color: AppTheme.mutedText(context),
                                         ),
@@ -250,36 +238,11 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                             ],
                           ),
                           const SizedBox(height: 12.0),
-                          Container(
-                            height: 1,
-                            color: AppTheme.border(context),
-                          ),
+                          Container(height: 1, color: AppTheme.border(context)),
                           const SizedBox(height: 12.0),
                           Text(
-                            'Productive Day Summary:',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: 12.0),
-                          _buildSummaryPoint(
-                            context,
-                            '1. API Testing - Completed unit tests for authentication module (2h 30min)',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildSummaryPoint(
-                            context,
-                            '2. Debugging - Fixed critical issue in payment processing (1h 45min)',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildSummaryPoint(
-                            context,
-                            '3. Team Sync - Attended sprint planning meeting (1h)',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildSummaryPoint(
-                            context,
-                            '4. Documentation - Updated API docs and README files (1h 10min)',
+                            widget.summary ?? 'No summary was generated.',
+                            style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
                       ),
@@ -293,9 +256,9 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                         border: Border.all(color: AppTheme.border(context)),
                       ),
                       child: Theme(
-                        data: Theme.of(context).copyWith(
-                          dividerColor: Colors.transparent,
-                        ),
+                        data: Theme.of(
+                          context,
+                        ).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
                           title: Row(
                             children: [
@@ -307,12 +270,8 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 'Detailed Breakdown',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
@@ -417,44 +376,17 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
         Text(
           value,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.mutedText(context),
-              ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryPoint(BuildContext context, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          margin: const EdgeInsets.only(top: 8),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.mutedText(context),
-                  height: 1.5,
-                ),
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
         ),
       ],
     );
@@ -476,15 +408,15 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedText(context),
-                    ),
+                  color: AppTheme.mutedText(context),
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedText(context),
-                    ),
+                  color: AppTheme.mutedText(context),
+                ),
               ),
             ],
           ),
@@ -499,9 +431,9 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
           child: Text(
             value,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
         ),
       ],

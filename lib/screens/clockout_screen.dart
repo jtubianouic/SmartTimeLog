@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../services/device_location_service.dart';
+import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
+import 'ai_summary_screen.dart';
 
 class ClockOutScreen extends StatefulWidget {
   const ClockOutScreen({super.key});
@@ -36,21 +39,55 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
     super.dispose();
   }
 
-  void _handleSubmit() async {
+  Future<void> _handleSubmit() async {
     if (_selectedProject == null || _selectedProject!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a project')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a project')));
       return;
     }
 
     setState(() => _isLoading = true);
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _isLoading = false);
+    final employeeInput = [
+      'Project: $_selectedProject',
+      if (_notesController.text.trim().isNotEmpty)
+        'Activities and notes: ${_notesController.text.trim()}',
+    ].join('\n');
 
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/summary');
+    try {
+      final position = await DeviceLocationService.getCurrentPosition();
+      final summary = await SmartTimeLogApi.instance.summarizeWork(
+        employeeInput,
+      );
+      await SmartTimeLogApi.instance.clockOut(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        employeeInput: employeeInput,
+      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => AISummaryScreen(summary: summary),
+          ),
+        );
+      }
+    } on LocationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -84,7 +121,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                     children: [
                       Text(
                         'Clock-out Log',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -93,8 +131,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                       Text(
                         'Step 4 of 5',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
                       ),
                     ],
                   ),
@@ -117,7 +155,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                         borderRadius: BorderRadius.circular(12),
                         color: AppTheme.successBackground(context),
                         border: Border.all(
-                          color: AppTheme.successBorder(context)),
+                          color: AppTheme.successBorder(context),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +168,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                    color: AppTheme.successBorder(context),
+                                  color: AppTheme.successBorder(context),
                                 ),
                                 child: Icon(
                                   Icons.check_circle,
@@ -149,9 +188,9 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                           .titleMedium
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                           ),
                                     ),
                                     const SizedBox(height: 4),
@@ -178,8 +217,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                     Text(
                       'Today\'s Session',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12.0),
                     Container(
@@ -188,32 +227,17 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: AppTheme.surface(context),
-                        border: Border.all(
-                          color: AppTheme.border(context)),
+                        border: Border.all(color: AppTheme.border(context)),
                       ),
                       child: Column(
                         children: [
-                          _buildDetailRow(
-                            context,
-                            'Clock In',
-                            '9:00 AM',
-                          ),
+                          _buildDetailRow(context, 'Clock In', '9:00 AM'),
                           const SizedBox(height: 12.0),
-                          Container(
-                            height: 1,
-                            color: AppTheme.border(context),
-                          ),
+                          Container(height: 1, color: AppTheme.border(context)),
                           const SizedBox(height: 12.0),
-                          _buildDetailRow(
-                            context,
-                            'Clock Out',
-                            '4:30 PM',
-                          ),
+                          _buildDetailRow(context, 'Clock Out', '4:30 PM'),
                           const SizedBox(height: 12.0),
-                          Container(
-                            height: 1,
-                            color: AppTheme.border(context),
-                          ),
+                          Container(height: 1, color: AppTheme.border(context)),
                           const SizedBox(height: 12.0),
                           _buildDetailRow(
                             context,
@@ -230,8 +254,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                     Text(
                       'Project/Client',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12.0),
                     DropdownButtonFormField<String>(
@@ -256,8 +280,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                     Text(
                       'Activities & Notes',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12.0),
                     TextField(
@@ -323,18 +347,16 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.mutedText(context),
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
         ),
         Text(
           value,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
-                color: isHighlight
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-              ),
+            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
+            color: isHighlight ? Theme.of(context).colorScheme.primary : null,
+          ),
         ),
       ],
     );
