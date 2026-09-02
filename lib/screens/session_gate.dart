@@ -40,9 +40,12 @@ class SessionGate extends StatefulWidget {
   static Widget destinationFor(AttendanceStatus status) {
     final api = SmartTimeLogApi.instance;
     return switch (status.state) {
-      AttendanceState.clockedIn => const ActiveShiftScreen(),
-      AttendanceState.onBreak => const ActiveShiftScreen(
-        initiallyOnBreak: true,
+      AttendanceState.clockedIn || AttendanceState.onBreak => ActiveShiftScreen(
+        initiallyOnBreak: status.state == AttendanceState.onBreak,
+        hasTakenBreak: status.hasTakenBreak,
+        initialClockedInDurationSeconds: status.clockedInDurationSeconds,
+        initialBreakDurationSeconds: status.breakDurationSeconds,
+        initialCurrentBreakDurationSeconds: status.currentBreakDurationSeconds,
       ),
       AttendanceState.notClockedIn || AttendanceState.clockedOut =>
         GeofenceClockInScreen(headquarters: api.currentEmployee?.headquarters),

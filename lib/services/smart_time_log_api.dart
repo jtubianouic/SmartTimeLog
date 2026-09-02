@@ -111,22 +111,48 @@ class AttendanceStatus {
   const AttendanceStatus({
     required this.date,
     required this.state,
+    required this.clockedInDurationSeconds,
+    required this.breakDurationSeconds,
+    required this.currentBreakDurationSeconds,
     required this.latestTimelog,
   });
 
   final DateTime date;
   final AttendanceState state;
+  final int clockedInDurationSeconds;
+  final int breakDurationSeconds;
+  final int currentBreakDurationSeconds;
   final Map<String, dynamic>? latestTimelog;
+
+  bool get hasTakenBreak =>
+      state == AttendanceState.onBreak ||
+      breakDurationSeconds > 0 ||
+      currentBreakDurationSeconds > 0 ||
+      const {
+        'break',
+        'break_start',
+        'break_end',
+      }.contains(latestTimelog?['log_type']);
 
   factory AttendanceStatus.fromJson(Map<String, dynamic> json) {
     final date = DateTime.tryParse(json['date'] as String? ?? '');
     final status = json['status'];
-    if (date == null || status is! String) {
+    final clockedInDurationSeconds = json['clockedInDurationSeconds'];
+    final breakDurationSeconds = json['breakDurationSeconds'];
+    final currentBreakDurationSeconds = json['currentBreakDurationSeconds'];
+    if (date == null ||
+        status is! String ||
+        clockedInDurationSeconds is! int ||
+        breakDurationSeconds is! int ||
+        currentBreakDurationSeconds is! int) {
       throw const FormatException('Invalid attendance status response.');
     }
     return AttendanceStatus(
       date: date,
       state: AttendanceState.fromJson(status),
+      clockedInDurationSeconds: clockedInDurationSeconds,
+      breakDurationSeconds: breakDurationSeconds,
+      currentBreakDurationSeconds: currentBreakDurationSeconds,
       latestTimelog: json['latestTimelog'] is Map<String, dynamic>
           ? json['latestTimelog'] as Map<String, dynamic>
           : null,
@@ -159,12 +185,10 @@ class SmartTimeLogApiClient {
   SmartTimeLogApiClient({
     required String baseUrl,
     http.Client? client,
-    SessionStorage? sessionStorage,
-    Duration requestTimeout = const Duration(seconds: 20),
+    this._sessionStorage,
+    this._requestTimeout = const Duration(seconds: 20),
   }) : _baseUrl = baseUrl.replaceFirst(RegExp(r'/$'), ''),
-       _client = client ?? http.Client(),
-       _sessionStorage = sessionStorage,
-       _requestTimeout = requestTimeout;
+       _client = client ?? http.Client();
 
   static const _tokenKey = 'access_token';
   static const _expiresAtKey = 'token_expires_at';
@@ -304,10 +328,21 @@ class SmartTimeLogApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> endBreak({
+    required double latitude,
+    required double longitude,
+  }) {
+    return _post(
+      '/api/mobile/break/end',
+      body: {'lat': latitude, 'long': longitude},
+    );
+  }
+
   Future<Map<String, dynamic>> clockOut({
     required double latitude,
     required double longitude,
     required String employeeInput,
+    required String aiSummary,
   }) {
     return _post(
       '/api/mobile/clock-out',
@@ -315,6 +350,7 @@ class SmartTimeLogApiClient {
         'lat': latitude,
         'long': longitude,
         'employeeInput': employeeInput,
+        'aiSummary': aiSummary,
       },
     );
   }
@@ -361,10 +397,10 @@ class SmartTimeLogApiClient {
       if (body != null) {
         request.body = jsonEncode(body);
       }
-        final response = await _client
+      final response = await _client
           .send(request)
           .then(http.Response.fromStream)
-            .timeout(_requestTimeout);
+          .timeout(_requestTimeout);
 
       final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
       if (response.statusCode < 200 || response.statusCode >= 300) {

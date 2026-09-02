@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import '../services/device_location_service.dart';
 import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/workflow_app_bar.dart';
 import 'clockout_screen.dart';
 import 'session_gate.dart';
 
@@ -11,14 +11,18 @@ class AISummaryScreen extends StatefulWidget {
     super.key,
     this.summary,
     this.employeeInput,
-    this.project,
     this.notes,
+    this.clockedInDurationSeconds = 0,
+    this.breakDurationSeconds = 0,
+    this.clockInTime,
   });
 
   final String? summary;
   final String? employeeInput;
-  final String? project;
   final String? notes;
+  final int clockedInDurationSeconds;
+  final int breakDurationSeconds;
+  final DateTime? clockInTime;
 
   @override
   State<AISummaryScreen> createState() => _AISummaryScreenState();
@@ -29,9 +33,16 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
 
   Future<void> _handleConfirm() async {
     final employeeInput = widget.employeeInput;
+    final aiSummary = widget.summary?.trim();
     if (employeeInput == null || employeeInput.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('The work input is missing.')),
+      );
+      return;
+    }
+    if (aiSummary == null || aiSummary.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The AI summary is missing.')),
       );
       return;
     }
@@ -43,6 +54,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
         latitude: position.latitude,
         longitude: position.longitude,
         employeeInput: employeeInput,
+        aiSummary: aiSummary,
       );
       if (mounted) {
         await SessionGate.routeAuthenticatedSession(context);
@@ -71,426 +83,259 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
       context,
       MaterialPageRoute<void>(
         builder: (_) => ClockOutScreen(
-          initialProject: widget.project,
           initialNotes: widget.notes,
+          initialClockedInDurationSeconds: widget.clockedInDurationSeconds,
+          initialBreakDurationSeconds: widget.breakDurationSeconds,
+          initialClockInTime: widget.clockInTime,
         ),
       ),
     );
   }
 
+  int get _activeDurationSeconds {
+    final duration =
+        widget.clockedInDurationSeconds - widget.breakDurationSeconds;
+    return duration < 0 ? 0 : duration;
+  }
+
+  String _formatDuration(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+      appBar: const WorkflowAppBar(
+        title: 'Review summary',
+        step: 5,
+        actions: [
+          Chip(
+            avatar: Icon(Icons.auto_awesome_rounded, size: 16),
+            label: Text('AI generated'),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'AI Summary Confirmation',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = constraints.maxWidth >= 620
+                          ? (constraints.maxWidth - 24) / 3
+                          : constraints.maxWidth;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildStatCard(
+                            context,
+                            width: cardWidth,
+                            label: 'Total duration',
+                            value: _formatDuration(
+                              widget.clockedInDurationSeconds,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Step 5 of 5',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? AppTheme.darkAccentPurple
-                              : AppTheme.lightAccentPurple,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.auto_awesome,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'AI Generated',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                            icon: Icons.schedule_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          _buildStatCard(
+                            context,
+                            width: cardWidth,
+                            label: 'Break time',
+                            value: _formatDuration(widget.breakDurationSeconds),
+                            icon: Icons.coffee_rounded,
+                            color: Theme.of(context).colorScheme.tertiary,
+                          ),
+                          _buildStatCard(
+                            context,
+                            width: cardWidth,
+                            label: 'Active time',
+                            value: _formatDuration(_activeDurationSeconds),
+                            icon: Icons.trending_up_rounded,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
+                  const SizedBox(height: 24.0),
 
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Summary Stats
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(
-                          colors: [
-                            Theme.of(context).brightness == Brightness.dark
-                                ? AppTheme.darkSummaryGradientStart
-                                : AppTheme.lightSummaryGradientStart,
-                            Theme.of(context).brightness == Brightness.dark
-                                ? AppTheme.darkSummaryGradientEnd
-                                : AppTheme.lightSummaryGradientEnd,
-                          ],
-                        ),
-                        border: Border.all(color: AppTheme.border(context)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildStatCard(
-                                context,
-                                'Total Duration',
-                                '8.25h',
-                                Icons.schedule,
-                                Theme.of(context).colorScheme.primary,
-                              ),
-                              _buildStatCard(
-                                context,
-                                'Break Time',
-                                '15 min',
-                                Icons.coffee,
-                                AppTheme.warningBorder(context),
-                              ),
-                              _buildStatCard(
-                                context,
-                                'Active Time',
-                                '8h 10m',
-                                Icons.trending_up,
-                                AppTheme.successBorder(context),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                  // AI Summary
+                  Text(
+                    'Generated AI summary',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 24.0),
-
-                    // AI Summary
-                    Text(
-                      'AI Generated Summary',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  const SizedBox(height: 12.0),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.mutedSurface(context),
+                      border: Border.all(color: AppTheme.border(context)),
                     ),
-                    const SizedBox(height: 12.0),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: AppTheme.mutedSurface(context),
-                        border: Border.all(color: AppTheme.border(context)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1),
-                                ),
-                                child: Icon(
-                                  Icons.auto_awesome,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 20,
-                                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.1),
                               ),
-                              const SizedBox(width: 12.0),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'SmartAI Summary',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Generated 2 minutes ago',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: AppTheme.mutedText(context),
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12.0),
-                          Container(height: 1, color: AppTheme.border(context)),
-                          const SizedBox(height: 12.0),
-                          Text(
-                            widget.summary ?? 'No summary was generated.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24.0),
-
-                    // Expandable Details
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border(context)),
-                      ),
-                      child: Theme(
-                        data: Theme.of(
-                          context,
-                        ).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          title: Row(
-                            children: [
-                              Icon(
-                                Icons.dashboard_customize,
+                              child: Icon(
+                                Icons.auto_awesome,
                                 color: Theme.of(context).colorScheme.primary,
                                 size: 20,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Detailed Breakdown',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildDetailItem(
-                                    context,
-                                    'Projects',
-                                    '2',
-                                    'Project A, Project B',
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildDetailItem(
-                                    context,
-                                    'Tasks',
-                                    '6',
-                                    'Completed all sprint items',
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildDetailItem(
-                                    context,
-                                    'Productivity Score',
-                                    '92%',
-                                    'Excellent focus and consistency',
-                                  ),
-                                ],
-                              ),
+                            ),
+                            const SizedBox(width: 12.0),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'SmartTimeLog AI',
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Ready for your review',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 12.0),
+                        Container(height: 1, color: AppTheme.border(context)),
+                        const SizedBox(height: 12.0),
+                        Text(
+                          widget.summary ?? 'No summary was generated.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 24.0),
+                ],
               ),
             ),
+          ),
 
-            // Bottom Buttons
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: AppTheme.border(context)),
-                ),
-              ),
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ShadButton.outline(
+                    child: OutlinedButton.icon(
                       onPressed: _isConfirming ? null : _handleEdit,
-                      child: Text(
-                        'Edit',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit work log'),
                     ),
                   ),
                   const SizedBox(height: 12.0),
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ShadButton(
+                    child: FilledButton.icon(
                       onPressed: _isConfirming ? null : _handleConfirm,
-                      child: _isConfirming
+                      icon: _isConfirming
                           ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 3),
-                            )
-                          : const Text(
-                              'Confirm & Clock Out',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
                               ),
-                            ),
+                            )
+                          : const Icon(Icons.task_alt_rounded),
+                      label: Text(
+                        _isConfirming
+                            ? 'Confirming...'
+                            : 'Confirm and clock out',
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildStatCard(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailItem(
-    BuildContext context,
-    String title,
-    String value,
-    String description,
-  ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    BuildContext context, {
+    required double width,
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.mutedText(context),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Icon(icon, color: color),
               ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.mutedText(context),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontFamily: AppTheme.appMonoFontFamily,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

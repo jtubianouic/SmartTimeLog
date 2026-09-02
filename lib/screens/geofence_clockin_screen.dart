@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import '../services/device_location_service.dart';
 import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/workflow_app_bar.dart';
 
 class GeofenceClockInScreen extends StatefulWidget {
   const GeofenceClockInScreen({super.key, this.headquarters});
@@ -179,273 +179,213 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Geofence Clock-in',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Step 2 of 5',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.8),
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _isLocating ? null : _refreshLocation,
-                    tooltip: 'Refresh location',
-                    icon: const Icon(Icons.my_location, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    if (widget.headquarters == null)
-                      _buildMessageCard(
-                        context,
-                        'No headquarters assigned',
-                        'Contact an administrator before clocking in.',
-                        Icons.location_off_outlined,
-                      )
-                    else
-                      _buildHeadquartersMap(context),
-                    if (_locationError != null) ...[
-                      const SizedBox(height: 12),
-                      _buildMessageCard(
-                        context,
-                        'Location unavailable',
-                        _locationError!,
-                        Icons.gps_off_outlined,
-                      ),
-                    ],
-                    const SizedBox(height: 24.0),
-
-                    if (widget.headquarters != null &&
-                        _distanceMeters != null) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16.0),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: _isWithinGeofence
-                              ? AppTheme.successBackground(context)
-                              : Theme.of(
-                                  context,
-                                ).colorScheme.tertiaryContainer,
-                          border: Border.all(
-                            color: _isWithinGeofence
-                                ? AppTheme.successBorder(context)
-                                : Theme.of(context).colorScheme.tertiary,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _isWithinGeofence
-                                    ? AppTheme.successBorder(context)
-                                  : Theme.of(context).colorScheme.tertiary,
-                              ),
-                              child: Icon(
-                                _isWithinGeofence
-                                    ? Icons.check_circle
-                                  : Icons.warning_amber_rounded,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16.0),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _isWithinGeofence
-                                        ? 'Within Geofence'
-                                        : 'Outside Geofence',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color:
-                                              Theme.of(context).brightness ==
-                                                  Brightness.dark
-                                              ? Colors.white
-                                              : Colors.black,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_formatDistance(_distanceMeters!)} from ${widget.headquarters!.name ?? 'headquarters'}',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color:
-                                              Theme.of(context).brightness ==
-                                                  Brightness.dark
-                                              ? Colors.white.withAlpha(
-                                                  (0.7 * 255).toInt(),
-                                                )
-                                              : Colors.black.withAlpha(
-                                                  (0.7 * 255).toInt(),
-                                                ),
-                                        ),
-                                  ),
-                                  if (!_isWithinGeofence) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'Clock-in is allowed, but your location will be recorded.',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24.0),
-                    ],
-
-                    if (widget.headquarters != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16.0),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: AppTheme.surface(context),
-                          border: Border.all(color: AppTheme.border(context)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Location Details',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 12.0),
-                            _buildLocationDetail(
-                              context,
-                              'Headquarters',
-                              widget.headquarters!.name ??
-                                  'HQ ${widget.headquarters!.id}',
-                            ),
-                            const SizedBox(height: 8),
-                            _buildLocationDetail(
-                              context,
-                              'Coordinates',
-                              '${widget.headquarters!.latitude.toStringAsFixed(6)}, ${widget.headquarters!.longitude.toStringAsFixed(6)}',
-                            ),
-                            const SizedBox(height: 8),
-                            _buildLocationDetail(
-                              context,
-                              'GPS accuracy',
-                              _currentPosition == null
-                                  ? 'Waiting...'
-                                  : '${_currentPosition!.accuracy.round()} m',
-                            ),
-                            const SizedBox(height: 8),
-                            _buildLocationDetail(
-                              context,
-                              'Allowed radius',
-                              '${_geofenceRadiusMeters.round()} m',
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            // Bottom Button
-            Container(
+      appBar: WorkflowAppBar(
+        title: 'Geofence clock-in',
+        step: 2,
+        actions: [
+          IconButton(
+            onPressed: _isLocating ? null : _refreshLocation,
+            tooltip: 'Refresh location',
+            icon: const Icon(Icons.my_location_rounded),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: AppTheme.border(context)),
-                ),
+              child: Column(
+                children: [
+                  if (widget.headquarters == null)
+                    _buildMessageCard(
+                      context,
+                      'No headquarters assigned',
+                      'Contact an administrator before clocking in.',
+                      Icons.location_off_outlined,
+                    )
+                  else
+                    _buildHeadquartersMap(context),
+                  if (_locationError != null) ...[
+                    const SizedBox(height: 12),
+                    _buildMessageCard(
+                      context,
+                      'Location unavailable',
+                      _locationError!,
+                      Icons.gps_off_outlined,
+                    ),
+                  ],
+                  const SizedBox(height: 24.0),
+
+                  if (widget.headquarters != null &&
+                      _distanceMeters != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: _isWithinGeofence
+                            ? AppTheme.successBackground(context)
+                            : Theme.of(context).colorScheme.tertiaryContainer,
+                        border: Border.all(
+                          color: _isWithinGeofence
+                              ? AppTheme.successBorder(context)
+                              : Theme.of(context).colorScheme.tertiary,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isWithinGeofence
+                                  ? AppTheme.successBorder(context)
+                                  : Theme.of(context).colorScheme.tertiary,
+                            ),
+                            child: Icon(
+                              _isWithinGeofence
+                                  ? Icons.check_circle
+                                  : Icons.warning_amber_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 16.0),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _isWithinGeofence
+                                      ? 'Within Geofence'
+                                      : 'Outside Geofence',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white
+                                            : Colors.black,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${_formatDistance(_distanceMeters!)} from ${widget.headquarters!.name ?? 'headquarters'}',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white.withAlpha(
+                                                (0.7 * 255).toInt(),
+                                              )
+                                            : Colors.black.withAlpha(
+                                                (0.7 * 255).toInt(),
+                                              ),
+                                      ),
+                                ),
+                                if (!_isWithinGeofence) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Clock-in is allowed, but your location will be recorded.',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24.0),
+                  ],
+
+                  if (widget.headquarters != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: AppTheme.surface(context),
+                        border: Border.all(color: AppTheme.border(context)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Location Details',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 12.0),
+                          _buildLocationDetail(
+                            context,
+                            'Headquarters',
+                            widget.headquarters!.name ??
+                                'HQ ${widget.headquarters!.id}',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildLocationDetail(
+                            context,
+                            'Coordinates',
+                            '${widget.headquarters!.latitude.toStringAsFixed(6)}, ${widget.headquarters!.longitude.toStringAsFixed(6)}',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildLocationDetail(
+                            context,
+                            'GPS accuracy',
+                            _currentPosition == null
+                                ? 'Waiting...'
+                                : '${_currentPosition!.accuracy.round()} m',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildLocationDetail(
+                            context,
+                            'Allowed radius',
+                            '${_geofenceRadiusMeters.round()} m',
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
+            ),
+          ),
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
-                child: ShadButton(
+                child: FilledButton.icon(
                   onPressed:
-                    _currentPosition != null &&
-                      !_isClockingIn &&
-                      !_isLocating
+                      _currentPosition != null && !_isClockingIn && !_isLocating
                       ? _handleClockIn
                       : null,
-                  child: _isClockingIn
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
-                          ),
+                  icon: _isClockingIn
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
                         )
-                        : Text(
-                          _isWithinGeofence ? 'Clock In' : 'Clock In Anyway',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      : const Icon(Icons.login_rounded),
+                  label: Text(
+                    _isClockingIn
+                        ? 'Clocking in...'
+                        : _isWithinGeofence
+                        ? 'Clock in'
+                        : 'Clock in anyway',
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

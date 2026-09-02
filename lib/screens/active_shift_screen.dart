@@ -1,68 +1,155 @@
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'dart:async';
 import '../services/device_location_service.dart';
 import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/workflow_app_bar.dart';
+import 'clockout_screen.dart';
+import 'session_gate.dart';
 
 class ActiveShiftScreen extends StatefulWidget {
-  const ActiveShiftScreen({super.key, this.initiallyOnBreak = false});
+  const ActiveShiftScreen({
+    super.key,
+    this.initiallyOnBreak = false,
+    this.hasTakenBreak = false,
+    this.initialClockedInDurationSeconds = 0,
+    this.initialBreakDurationSeconds = 0,
+    this.initialCurrentBreakDurationSeconds = 0,
+  });
 
   final bool initiallyOnBreak;
+  final bool hasTakenBreak;
+  final int initialClockedInDurationSeconds;
+  final int initialBreakDurationSeconds;
+  final int initialCurrentBreakDurationSeconds;
 
   @override
   State<ActiveShiftScreen> createState() => _ActiveShiftScreenState();
 }
 
-class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
+class _ActiveShiftScreenState extends State<ActiveShiftScreen>
+    with WidgetsBindingObserver {
   late Timer _timer;
-  int _elapsedSeconds = 0;
+  late int _clockedInDurationSeconds;
+  late int _breakDurationSeconds;
+  late int _currentBreakDurationSeconds;
   late bool _isOnBreak;
+  late bool _hasTakenBreak;
   bool _isUpdatingBreak = false;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isOnBreak = widget.initiallyOnBreak;
+    _hasTakenBreak = widget.hasTakenBreak || widget.initiallyOnBreak;
+    _clockedInDurationSeconds = widget.initialClockedInDurationSeconds;
+    _breakDurationSeconds = widget.initialBreakDurationSeconds;
+    _currentBreakDurationSeconds = widget.initialCurrentBreakDurationSeconds;
     _startTimer();
+    if (SmartTimeLogApi.instance.hasSession) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStatus());
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        SmartTimeLogApi.instance.hasSession) {
+      _refreshStatus();
+    }
   }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        _elapsedSeconds++;
+        _clockedInDurationSeconds++;
+        if (_isOnBreak) {
+          _currentBreakDurationSeconds++;
+        }
       });
     });
   }
 
-  String _formatTime(int seconds) {
+  Future<void> _refreshStatus() async {
+    if (_isRefreshing || !mounted) return;
+    setState(() => _isRefreshing = true);
+    try {
+      final status = await SmartTimeLogApi.instance.getAttendanceStatus();
+      if (!mounted) return;
+      if (status.state != AttendanceState.clockedIn &&
+          status.state != AttendanceState.onBreak) {
+        await SessionGate.routeAuthenticatedSession(context);
+        return;
+      }
+      setState(() {
+        _isOnBreak = status.state == AttendanceState.onBreak;
+        _hasTakenBreak = status.hasTakenBreak;
+        _clockedInDurationSeconds = status.clockedInDurationSeconds;
+        _breakDurationSeconds = status.breakDurationSeconds;
+        _currentBreakDurationSeconds = status.currentBreakDurationSeconds;
+      });
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  int get _totalBreakDurationSeconds =>
+      _breakDurationSeconds + _currentBreakDurationSeconds;
+
+  int get _activeWorkDurationSeconds {
+    final duration = _clockedInDurationSeconds - _totalBreakDurationSeconds;
+    return duration < 0 ? 0 : duration;
+  }
+
+  String _formatDuration(int seconds) {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     final secs = seconds % 60;
-    return '${hours.toString().padLeft(2, '0')}h ${minutes.toString().padLeft(2, '0')}m ${secs.toString().padLeft(2, '0')}s';
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${secs.toString().padLeft(2, '0')}';
   }
 
   Future<void> _handleTakeBreak() async {
-    if (_isOnBreak) {
-      setState(() => _isOnBreak = false);
-      return;
-    }
-
     setState(() => _isUpdatingBreak = true);
     try {
       final position = await DeviceLocationService.getCurrentPosition();
-      await SmartTimeLogApi.instance.takeBreak(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
+      if (_isOnBreak) {
+        await SmartTimeLogApi.instance.endBreak(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      } else {
+        await SmartTimeLogApi.instance.takeBreak(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      }
       if (mounted) {
-        setState(() => _isOnBreak = true);
+        setState(() {
+          if (_isOnBreak) {
+            _breakDurationSeconds += _currentBreakDurationSeconds;
+            _currentBreakDurationSeconds = 0;
+          }
+          _isOnBreak = !_isOnBreak;
+          _hasTakenBreak = true;
+        });
+        await _refreshStatus();
       }
     } on LocationException catch (error) {
       if (mounted) {
@@ -84,391 +171,347 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
   }
 
   void _handleClockOut() {
-    Navigator.pushReplacementNamed(context, '/clockout');
+    if (!_hasTakenBreak || _isOnBreak) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ClockOutScreen(
+          initialClockedInDurationSeconds: _clockedInDurationSeconds,
+          initialBreakDurationSeconds: _totalBreakDurationSeconds,
+          initialClockInTime: DateTime.now().subtract(
+            Duration(seconds: _clockedInDurationSeconds),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      appBar: WorkflowAppBar(
+        title: 'Active shift',
+        step: 3,
+        actions: [
+          Chip(
+            avatar: const Icon(Icons.circle, size: 10),
+            label: Text(_isOnBreak ? 'On break' : 'Clocked in'),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshStatus,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Active Shift',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Card(
+                            color: colorScheme.primaryContainer,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
                             ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Step 3 of 5',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.successBackground(context),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.black.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Clocked In',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black.withValues(alpha: 0.5),
-                                fontWeight: FontWeight.w600,
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _isOnBreak
+                                            ? Icons.coffee_rounded
+                                            : Icons.timer_outlined,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        _isOnBreak
+                                            ? 'Break in progress'
+                                            : 'Shift elapsed',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: colorScheme
+                                                  .onPrimaryContainer,
+                                            ),
+                                      ),
+                                      const Spacer(),
+                                      if (_isRefreshing)
+                                        SizedBox.square(
+                                          dimension: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color:
+                                                colorScheme.onPrimaryContainer,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _formatDuration(
+                                        _clockedInDurationSeconds,
+                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .displayMedium
+                                          ?.copyWith(
+                                            color:
+                                                colorScheme.onPrimaryContainer,
+                                            fontFamily:
+                                                AppTheme.appMonoFontFamily,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Synced with today\'s attendance record',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: colorScheme.onPrimaryContainer
+                                              .withValues(alpha: 0.75),
+                                        ),
+                                  ),
+                                ],
                               ),
-                        ),
-                      ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DurationCard(
+                                  label: 'Active work',
+                                  value: _formatDuration(
+                                    _activeWorkDurationSeconds,
+                                  ),
+                                  icon: Icons.work_outline_rounded,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _DurationCard(
+                                  label: 'Total break',
+                                  value: _formatDuration(
+                                    _totalBreakDurationSeconds,
+                                  ),
+                                  icon: Icons.free_breakfast_outlined,
+                                  color: colorScheme.tertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Card(
+                            color: _isOnBreak
+                                ? colorScheme.tertiaryContainer
+                                : colorScheme.surfaceContainerLow,
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: _isOnBreak
+                                          ? colorScheme.tertiary
+                                          : colorScheme.secondaryContainer,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Icon(
+                                      _hasTakenBreak
+                                          ? Icons.task_alt_rounded
+                                          : Icons.coffee_rounded,
+                                      color: _isOnBreak
+                                          ? colorScheme.onTertiary
+                                          : colorScheme.onSecondaryContainer,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _isOnBreak
+                                              ? 'Break in progress'
+                                              : _hasTakenBreak
+                                              ? 'Break completed'
+                                              : 'One break required',
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _isOnBreak
+                                              ? 'End your break before clocking out'
+                                              : _hasTakenBreak
+                                              ? 'Break completed for today'
+                                              : 'Take your break before clocking out',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                        if (_isOnBreak) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            _formatDuration(
+                                              _currentBreakDurationSeconds,
+                                            ),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleLarge
+                                                ?.copyWith(
+                                                  fontFamily: AppTheme
+                                                      .appMonoFontFamily,
+                                                  color: colorScheme.tertiary,
+                                                ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
 
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    // Timer Display
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(32.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: LinearGradient(
-                          colors: [
-                            Theme.of(context).colorScheme.primary,
-                            Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.8),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Total Duration',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                          ),
-                          const SizedBox(height: 16.0),
-                          Text(
-                            _formatTime(_elapsedSeconds),
-                            style: Theme.of(context).textTheme.displayLarge
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'monospace',
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32.0),
-
-                    // Status Cards
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatusCard(
-                            context,
-                            'Clocked in',
-                            '09:00 AM',
-                            Icons.access_time,
-                            Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatusCard(
-                            context,
-                            'Location',
-                            'In Office',
-                            Icons.location_on,
-                            AppTheme.successBorder(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24.0),
-
-                    // Break Status
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: _isOnBreak
-                            ? AppTheme.warningBackground(context)
-                            : AppTheme.mutedSurface(context),
-                        border: Border.all(
-                          color: _isOnBreak
-                              ? AppTheme.warningBorder(context)
-                              : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _isOnBreak
-                                  ? AppTheme.warningBorder(context)
-                                  : Theme.of(context).colorScheme.primary,
-                            ),
-                            child: Icon(
-                              _isOnBreak ? Icons.coffee : Icons.work,
-                              color: _isOnBreak
-                                  ? Theme.of(context).colorScheme.onSurface
-                                  : Theme.of(context).colorScheme.primary,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 16.0),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _isOnBreak ? 'On Break' : 'Working',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: _isOnBreak
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _isOnBreak
-                                      ? 'Break timer paused'
-                                      : 'Actively working',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppTheme.mutedText(context),
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24.0),
-
-                    // Quick Stats
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: AppTheme.mutedSurface(context),
-                        border: Border.all(color: AppTheme.border(context)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Today\'s Summary',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 12.0),
-                          _buildSummaryRow(context, 'Break Time', '15 min'),
-                          const SizedBox(height: 8),
-                          _buildSummaryRow(context, 'Tasks Logged', '3'),
-                          const SizedBox(height: 8),
-                          _buildSummaryRow(context, 'Projects', '2'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Bottom Buttons
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: AppTheme.border(context)),
-                ),
-              ),
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ShadButton.outline(
-                      onPressed: _isUpdatingBreak ? null : _handleTakeBreak,
-                      child: _isUpdatingBreak
+                    child: FilledButton.tonalIcon(
+                      onPressed:
+                          _isUpdatingBreak || (_hasTakenBreak && !_isOnBreak)
+                          ? null
+                          : _handleTakeBreak,
+                      icon: _isUpdatingBreak
                           ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 3),
-                            )
-                          : Text(
-                              _isOnBreak ? 'Resume Work' : 'Take Break',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: _isOnBreak
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Theme.of(context).colorScheme.primary,
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
                               ),
+                            )
+                          : Icon(
+                              _isOnBreak
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.coffee_rounded,
                             ),
+                      label: Text(
+                        _isOnBreak
+                            ? 'End break'
+                            : _hasTakenBreak
+                            ? 'Break completed'
+                            : 'Take break',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12.0),
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ShadButton(
-                      onPressed: _handleClockOut,
-                      child: const Text(
-                        'Clock Out',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    child: FilledButton.icon(
+                      onPressed: !_hasTakenBreak || _isOnBreak
+                          ? null
+                          : _handleClockOut,
+                      icon: const Icon(Icons.logout_rounded),
+                      label: const Text('Clock out'),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusCard(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: color.withValues(alpha: 0.1),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12.0),
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildSummaryRow(BuildContext context, String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppTheme.mutedText(context)),
+class _DurationCard extends StatelessWidget {
+  const _DurationCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(height: 14),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontFamily: AppTheme.appMonoFontFamily,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
-        Text(
-          value,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-      ],
+      ),
     );
   }
 }

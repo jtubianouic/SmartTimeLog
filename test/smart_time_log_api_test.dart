@@ -48,6 +48,9 @@ void main() {
             'ok': true,
             'date': '2026-09-02',
             'status': 'clocked_in',
+            'clockedInDurationSeconds': 3600,
+            'breakDurationSeconds': 900,
+            'currentBreakDurationSeconds': 0,
             'latestTimelog': {
               'timelog_id': 9,
               'employee_id': 42,
@@ -76,11 +79,13 @@ void main() {
     final status = await api.getAttendanceStatus();
     await api.clockIn(latitude: 7.0731, longitude: 125.6128);
     await api.takeBreak(latitude: 7.0731, longitude: 125.6128);
+    await api.endBreak(latitude: 7.0731, longitude: 125.6128);
     final summary = await api.summarizeWork('Completed API integration');
     await api.clockOut(
       latitude: 7.0731,
       longitude: 125.6128,
       employeeInput: 'Completed API integration',
+      aiSummary: summary,
     );
 
     expect(summary, 'Generated summary');
@@ -90,6 +95,10 @@ void main() {
     expect(employee.headquarters?.latitude, 7.0731);
     expect(employee.headquarters?.longitude, 125.6128);
     expect(status.state, AttendanceState.clockedIn);
+    expect(status.clockedInDurationSeconds, 3600);
+    expect(status.breakDurationSeconds, 900);
+    expect(status.currentBreakDurationSeconds, 0);
+    expect(status.hasTakenBreak, isTrue);
     expect(status.latestTimelog?['timelog_id'], 9);
     expect(storage.values['access_token'], 'test-token');
     expect(requests.map((request) => request.url.path), [
@@ -97,6 +106,7 @@ void main() {
       '/api/mobile/status',
       '/api/mobile/clock-in',
       '/api/mobile/break',
+      '/api/mobile/break/end',
       '/api/mobile/ai-summary',
       '/api/mobile/clock-out',
     ]);
@@ -111,13 +121,15 @@ void main() {
     }
     expect(jsonDecode(requests[2].body), {'lat': 7.0731, 'long': 125.6128});
     expect(jsonDecode(requests[3].body), {'lat': 7.0731, 'long': 125.6128});
-    expect(jsonDecode(requests[4].body), {
+    expect(jsonDecode(requests[4].body), {'lat': 7.0731, 'long': 125.6128});
+    expect(jsonDecode(requests[5].body), {
       'employeeInput': 'Completed API integration',
     });
-    expect(jsonDecode(requests[5].body), {
+    expect(jsonDecode(requests[6].body), {
       'lat': 7.0731,
       'long': 125.6128,
       'employeeInput': 'Completed API integration',
+      'aiSummary': 'Generated summary',
     });
   });
 
@@ -209,6 +221,19 @@ void main() {
     );
   });
 
+  test('recognizes a completed zero-second break', () {
+    final status = AttendanceStatus.fromJson({
+      'date': '2026-09-02',
+      'status': 'clocked_in',
+      'clockedInDurationSeconds': 60,
+      'breakDurationSeconds': 0,
+      'currentBreakDurationSeconds': 0,
+      'latestTimelog': {'log_type': 'break_end'},
+    });
+
+    expect(status.hasTakenBreak, isTrue);
+  });
+
   test('times out when the response body never completes', () async {
     final api = SmartTimeLogApiClient(
       baseUrl: 'https://example.com',
@@ -264,9 +289,6 @@ class _MemorySessionStorage implements SessionStorage {
 class _NeverCompletingClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    return http.StreamedResponse(
-      StreamController<List<int>>().stream,
-      200,
-    );
+    return http.StreamedResponse(StreamController<List<int>>().stream, 200);
   }
 }
