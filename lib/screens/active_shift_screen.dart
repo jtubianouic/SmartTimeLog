@@ -6,7 +6,9 @@ import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
 
 class ActiveShiftScreen extends StatefulWidget {
-  const ActiveShiftScreen({super.key});
+  const ActiveShiftScreen({super.key, this.initiallyOnBreak = false});
+
+  final bool initiallyOnBreak;
 
   @override
   State<ActiveShiftScreen> createState() => _ActiveShiftScreenState();
@@ -15,12 +17,13 @@ class ActiveShiftScreen extends StatefulWidget {
 class _ActiveShiftScreenState extends State<ActiveShiftScreen> {
   late Timer _timer;
   int _elapsedSeconds = 0;
-  bool _isOnBreak = false;
+  late bool _isOnBreak;
   bool _isUpdatingBreak = false;
 
   @override
   void initState() {
     super.initState();
+    _isOnBreak = widget.initiallyOnBreak;
     _startTimer();
   }
 

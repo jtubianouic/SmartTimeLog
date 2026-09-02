@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'geofence_clockin_screen.dart';
+import 'session_gate.dart';
 import '../services/smart_time_log_api.dart';
 import '../widgets/theme_toggle_button.dart';
 
@@ -36,18 +36,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final employee = await SmartTimeLogApi.instance.login(
+      await SmartTimeLogApi.instance.login(
         username: username,
         password: password,
       );
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                GeofenceClockInScreen(headquarters: employee.headquarters),
-          ),
-        );
+        await SessionGate.routeAuthenticatedSession(context);
       }
     } on ApiException catch (error) {
       if (mounted) {

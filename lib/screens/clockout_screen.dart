@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../services/device_location_service.dart';
 import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
 import 'ai_summary_screen.dart';
 
 class ClockOutScreen extends StatefulWidget {
-  const ClockOutScreen({super.key});
+  const ClockOutScreen({super.key, this.initialProject, this.initialNotes});
+
+  final String? initialProject;
+  final String? initialNotes;
 
   @override
   State<ClockOutScreen> createState() => _ClockOutScreenState();
@@ -29,7 +31,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
   void initState() {
     super.initState();
     _projectController = TextEditingController();
-    _notesController = TextEditingController();
+    _notesController = TextEditingController(text: widget.initialNotes);
+    _selectedProject = widget.initialProject;
   }
 
   @override
@@ -55,28 +58,21 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
     ].join('\n');
 
     try {
-      final position = await DeviceLocationService.getCurrentPosition();
       final summary = await SmartTimeLogApi.instance.summarizeWork(
         employeeInput,
-      );
-      await SmartTimeLogApi.instance.clockOut(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        employeeInput: employeeInput,
       );
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute<void>(
-            builder: (_) => AISummaryScreen(summary: summary),
+            builder: (_) => AISummaryScreen(
+              summary: summary,
+              employeeInput: employeeInput,
+              project: _selectedProject!,
+              notes: _notesController.text,
+            ),
           ),
         );
-      }
-    } on LocationException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     } on ApiException catch (error) {
       if (mounted) {
@@ -182,7 +178,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Clocked Out Successfully',
+                                      'Review Your Work Log',
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
@@ -195,7 +191,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '4:30 PM - In Office Hub',
+                                      'Generate an AI summary before clocking out',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
@@ -235,14 +231,18 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                           const SizedBox(height: 12.0),
                           Container(height: 1, color: AppTheme.border(context)),
                           const SizedBox(height: 12.0),
-                          _buildDetailRow(context, 'Clock Out', '4:30 PM'),
+                          _buildDetailRow(
+                            context,
+                            'Clock Out',
+                            'Pending confirmation',
+                          ),
                           const SizedBox(height: 12.0),
                           Container(height: 1, color: AppTheme.border(context)),
                           const SizedBox(height: 12.0),
                           _buildDetailRow(
                             context,
                             'Total Duration',
-                            '7h 30m',
+                            'Calculated after clock-out',
                             isHighlight: true,
                           ),
                         ],
@@ -321,7 +321,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                           ),
                         )
                       : const Text(
-                          'Submit Log',
+                          'Generate Summary',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

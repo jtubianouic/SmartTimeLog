@@ -1,33 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../services/device_location_service.dart';
+import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
+import 'clockout_screen.dart';
+import 'session_gate.dart';
 
 class AISummaryScreen extends StatefulWidget {
-  const AISummaryScreen({super.key, this.summary});
+  const AISummaryScreen({
+    super.key,
+    this.summary,
+    this.employeeInput,
+    this.project,
+    this.notes,
+  });
 
   final String? summary;
+  final String? employeeInput;
+  final String? project;
+  final String? notes;
 
   @override
   State<AISummaryScreen> createState() => _AISummaryScreenState();
 }
 
 class _AISummaryScreenState extends State<AISummaryScreen> {
-  void _handleConfirm() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Summary confirmed! Ready for next shift.'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-    Future.delayed(const Duration(seconds: 1), () {
+  bool _isConfirming = false;
+
+  Future<void> _handleConfirm() async {
+    final employeeInput = widget.employeeInput;
+    if (employeeInput == null || employeeInput.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The work input is missing.')),
+      );
+      return;
+    }
+
+    setState(() => _isConfirming = true);
+    try {
+      final position = await DeviceLocationService.getCurrentPosition();
+      await SmartTimeLogApi.instance.clockOut(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        employeeInput: employeeInput,
+      );
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
+        await SessionGate.routeAuthenticatedSession(context);
       }
-    });
+    } on LocationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isConfirming = false);
+      }
+    }
   }
 
   void _handleEdit() {
-    Navigator.pushReplacementNamed(context, '/clockout');
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ClockOutScreen(
+          initialProject: widget.project,
+          initialNotes: widget.notes,
+        ),
+      ),
+    );
   }
 
   @override
@@ -327,7 +375,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ShadButton.outline(
-                      onPressed: _handleEdit,
+                      onPressed: _isConfirming ? null : _handleEdit,
                       child: Text(
                         'Edit',
                         style: TextStyle(
@@ -343,14 +391,20 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ShadButton(
-                      onPressed: _handleConfirm,
-                      child: const Text(
-                        'Confirm',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      onPressed: _isConfirming ? null : _handleConfirm,
+                      child: _isConfirming
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 3),
+                            )
+                          : const Text(
+                              'Confirm & Clock Out',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],

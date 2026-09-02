@@ -107,8 +107,12 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
     setState(() => _isClockingIn = true);
     try {
       final position = await _refreshLocation();
-      if (position == null || !_isWithinGeofence) {
+      if (position == null) {
         return;
+      }
+      if (!_isWithinGeofence) {
+        final shouldContinue = await _confirmOutsideGeofence();
+        if (!shouldContinue) return;
       }
       await SmartTimeLogApi.instance.clockIn(
         latitude: position.latitude,
@@ -134,6 +138,35 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
         setState(() => _isClockingIn = false);
       }
     }
+  }
+
+  Future<bool> _confirmOutsideGeofence() async {
+    final distance = _distanceMeters;
+    if (distance == null) return false;
+
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.warning_amber_rounded),
+            title: const Text('Outside Geofence'),
+            content: Text(
+              'You are ${_formatDistance(distance)} from headquarters, outside '
+              'the ${_geofenceRadiusMeters.round()} m allowed radius. Your '
+              'location will be recorded. Do you still want to clock in?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Clock In Anyway'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   String _formatDistance(double distance) {
@@ -235,11 +268,13 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                           borderRadius: BorderRadius.circular(12),
                           color: _isWithinGeofence
                               ? AppTheme.successBackground(context)
-                              : Theme.of(context).colorScheme.errorContainer,
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.tertiaryContainer,
                           border: Border.all(
                             color: _isWithinGeofence
                                 ? AppTheme.successBorder(context)
-                                : Theme.of(context).colorScheme.error,
+                                : Theme.of(context).colorScheme.tertiary,
                           ),
                         ),
                         child: Row(
@@ -251,12 +286,12 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                                 shape: BoxShape.circle,
                                 color: _isWithinGeofence
                                     ? AppTheme.successBorder(context)
-                                    : Theme.of(context).colorScheme.error,
+                                  : Theme.of(context).colorScheme.tertiary,
                               ),
                               child: Icon(
                                 _isWithinGeofence
                                     ? Icons.check_circle
-                                    : Icons.cancel,
+                                  : Icons.warning_amber_rounded,
                                 color: Colors.white,
                                 size: 28,
                               ),
@@ -298,6 +333,18 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                                                 ),
                                         ),
                                   ),
+                                  if (!_isWithinGeofence) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Clock-in is allowed, but your location will be recorded.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -370,7 +417,10 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ShadButton(
-                  onPressed: _isWithinGeofence && !_isClockingIn && !_isLocating
+                  onPressed:
+                    _currentPosition != null &&
+                      !_isClockingIn &&
+                      !_isLocating
                       ? _handleClockIn
                       : null,
                   child: _isClockingIn
@@ -384,8 +434,8 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                             ),
                           ),
                         )
-                      : const Text(
-                          'Clock In',
+                        : Text(
+                          _isWithinGeofence ? 'Clock In' : 'Clock In Anyway',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

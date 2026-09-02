@@ -9,6 +9,7 @@ import 'screens/geofence_clockin_screen.dart';
 import 'screens/active_shift_screen.dart';
 import 'screens/clockout_screen.dart';
 import 'screens/ai_summary_screen.dart';
+import 'screens/session_gate.dart';
 
 Future<void> main() async {
   await dotenv.load(fileName: ".env");
@@ -17,7 +18,7 @@ Future<void> main() async {
   if (baseUrl == null || baseUrl.isEmpty) {
     throw StateError('BASE_URL is missing from .env');
   }
-  SmartTimeLogApi.initialize(baseUrl: baseUrl);
+  await SmartTimeLogApi.initialize(baseUrl: baseUrl);
 
   runApp(const MyApp());
 }
@@ -25,7 +26,9 @@ Future<void> main() async {
 final themeNotifier = ThemeNotifier();
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.home = const SessionGate()});
+
+  final Widget home;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +46,10 @@ class MyApp extends StatelessWidget {
                 ? AppTheme.darkTheme()
                 : AppTheme.lightTheme();
           },
-          home: const LoginScreen(),
+          builder: (context, child) => ScaffoldMessenger(
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: home,
           routes: {
             '/login': (context) => const LoginScreen(),
             '/geofence': (context) => const GeofenceClockInScreen(),
