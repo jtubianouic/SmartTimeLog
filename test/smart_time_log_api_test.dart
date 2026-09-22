@@ -67,7 +67,7 @@ void main() {
     });
     final storage = _MemorySessionStorage();
     final api = SmartTimeLogApiClient(
-      baseUrl: 'https://example.com/',
+      baseUrl: 'https://smarttimelog-admin.vercel.app',
       client: client,
       sessionStorage: storage,
     );

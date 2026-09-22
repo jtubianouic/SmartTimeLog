@@ -22,7 +22,7 @@ void main() {
 
   setUpAll(() async {
     await SmartTimeLogApi.initialize(
-      baseUrl: 'https://example.com',
+      baseUrl: 'https://smarttimelog-admin.vercel.app',
       sessionStorage: storage,
     );
   });
