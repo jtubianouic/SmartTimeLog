@@ -107,6 +107,67 @@ enum AttendanceState {
   };
 }
 
+enum AttendanceTimelogType {
+  clockIn,
+  breakStart,
+  breakEnd,
+  clockOut;
+
+  String get label => switch (this) {
+    clockIn => 'Clocked in',
+    breakStart => 'Break started',
+    breakEnd => 'Break ended',
+    clockOut => 'Clocked out',
+  };
+
+  factory AttendanceTimelogType.fromJson(String value) => switch (value) {
+    'clock_in' => clockIn,
+    'break' || 'break_start' => breakStart,
+    'break_end' => breakEnd,
+    'clock_out' => clockOut,
+    _ => throw const FormatException('Invalid attendance timelog type.'),
+  };
+}
+
+class AttendanceTimelog {
+  const AttendanceTimelog({
+    required this.id,
+    required this.employeeId,
+    required this.type,
+    required this.timestamp,
+    this.latitude,
+    this.longitude,
+  });
+
+  final int id;
+  final int employeeId;
+  final AttendanceTimelogType type;
+  final DateTime timestamp;
+  final double? latitude;
+  final double? longitude;
+
+  factory AttendanceTimelog.fromJson(Map<String, dynamic> json) {
+    final id = json['timelog_id'];
+    final employeeId = json['employee_id'];
+    final logType = json['log_type'];
+    final timestamp = DateTime.tryParse(json['timestamp'] as String? ?? '');
+    if (id is! int ||
+        employeeId is! int ||
+        logType is! String ||
+        timestamp == null) {
+      throw const FormatException('Invalid attendance timelog response.');
+    }
+    return AttendanceTimelog(
+      id: id,
+      employeeId: employeeId,
+      type: AttendanceTimelogType.fromJson(logType),
+      timestamp: timestamp,
+      latitude: (json['lat'] as num?)?.toDouble(),
+      longitude: (json['long'] as num?)?.toDouble(),
+    );
+  }
+}
+
 class AttendanceStatus {
   const AttendanceStatus({
     required this.date,
@@ -115,6 +176,7 @@ class AttendanceStatus {
     required this.breakDurationSeconds,
     required this.currentBreakDurationSeconds,
     required this.latestTimelog,
+    this.timelogs = const [],
   });
 
   final DateTime date;
@@ -122,40 +184,123 @@ class AttendanceStatus {
   final int clockedInDurationSeconds;
   final int breakDurationSeconds;
   final int currentBreakDurationSeconds;
-  final Map<String, dynamic>? latestTimelog;
+  final AttendanceTimelog? latestTimelog;
+  final List<AttendanceTimelog> timelogs;
 
   bool get hasTakenBreak =>
       state == AttendanceState.onBreak ||
       breakDurationSeconds > 0 ||
       currentBreakDurationSeconds > 0 ||
-      const {
-        'break',
-        'break_start',
-        'break_end',
-      }.contains(latestTimelog?['log_type']);
+      latestTimelog?.type == AttendanceTimelogType.breakStart ||
+      latestTimelog?.type == AttendanceTimelogType.breakEnd ||
+      timelogs.any(
+        (timelog) =>
+            timelog.type == AttendanceTimelogType.breakStart ||
+            timelog.type == AttendanceTimelogType.breakEnd,
+      );
 
   factory AttendanceStatus.fromJson(Map<String, dynamic> json) {
-    final date = DateTime.tryParse(json['date'] as String? ?? '');
     final status = json['status'];
-    final clockedInDurationSeconds = json['clockedInDurationSeconds'];
-    final breakDurationSeconds = json['breakDurationSeconds'];
-    final currentBreakDurationSeconds = json['currentBreakDurationSeconds'];
-    if (date == null ||
-        status is! String ||
-        clockedInDurationSeconds is! int ||
-        breakDurationSeconds is! int ||
-        currentBreakDurationSeconds is! int) {
+    final timelogsJson = json['timelogs'];
+    if (status is! String ||
+        (timelogsJson != null && timelogsJson is! List<dynamic>)) {
       throw const FormatException('Invalid attendance status response.');
     }
+    final state = AttendanceState.fromJson(status);
+    final timelogs = (timelogsJson as List<dynamic>? ?? const [])
+        .map((entry) {
+          if (entry is! Map) {
+            throw const FormatException('Invalid attendance timelog response.');
+          }
+          return AttendanceTimelog.fromJson(Map<String, dynamic>.from(entry));
+        })
+        .toList(growable: false);
+    final latestTimelogJson = json['latestTimelog'];
+    final latestTimelog =
+        latestTimelogJson is Map && latestTimelogJson.isNotEmpty
+        ? AttendanceTimelog.fromJson(
+            Map<String, dynamic>.from(latestTimelogJson),
+          )
+        : null;
+    final derivedDurations = _deriveDurations(state, timelogs);
+    final date =
+        DateTime.tryParse(json['date'] as String? ?? '') ??
+        (timelogs.isEmpty
+            ? DateTime.now()
+            : timelogs
+                  .map((timelog) => timelog.timestamp)
+                  .reduce((a, b) => a.isAfter(b) ? a : b));
     return AttendanceStatus(
       date: date,
-      state: AttendanceState.fromJson(status),
-      clockedInDurationSeconds: clockedInDurationSeconds,
-      breakDurationSeconds: breakDurationSeconds,
-      currentBreakDurationSeconds: currentBreakDurationSeconds,
-      latestTimelog: json['latestTimelog'] is Map<String, dynamic>
-          ? json['latestTimelog'] as Map<String, dynamic>
-          : null,
+      state: state,
+      clockedInDurationSeconds:
+          (json['clockedInDurationSeconds'] as num?)?.toInt() ??
+          derivedDurations.clockedIn,
+      breakDurationSeconds:
+          (json['breakDurationSeconds'] as num?)?.toInt() ??
+          derivedDurations.completedBreak,
+      currentBreakDurationSeconds:
+          (json['currentBreakDurationSeconds'] as num?)?.toInt() ??
+          derivedDurations.currentBreak,
+      latestTimelog: latestTimelog,
+      timelogs: timelogs,
+    );
+  }
+
+  static ({int clockedIn, int completedBreak, int currentBreak})
+  _deriveDurations(AttendanceState state, List<AttendanceTimelog> timelogs) {
+    final ordered = [...timelogs]
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final clockInIndex = ordered.lastIndexWhere(
+      (timelog) => timelog.type == AttendanceTimelogType.clockIn,
+    );
+    if (clockInIndex == -1) {
+      return (clockedIn: 0, completedBreak: 0, currentBreak: 0);
+    }
+
+    final now = DateTime.now().toUtc();
+    final currentShift = ordered.sublist(clockInIndex);
+    final clockInTime = currentShift.first.timestamp;
+    AttendanceTimelog? clockOut;
+    for (final timelog in currentShift) {
+      if (timelog.type == AttendanceTimelogType.clockOut) {
+        clockOut = timelog;
+        break;
+      }
+    }
+    final shiftEnd = clockOut?.timestamp ?? now;
+    final clockedIn = shiftEnd.difference(clockInTime).inSeconds;
+
+    var completedBreak = 0;
+    DateTime? breakStartedAt;
+    for (final timelog in currentShift.skip(1)) {
+      switch (timelog.type) {
+        case AttendanceTimelogType.breakStart:
+          breakStartedAt ??= timelog.timestamp;
+        case AttendanceTimelogType.breakEnd:
+          final startedAt = breakStartedAt;
+          if (startedAt != null) {
+            completedBreak += timelog.timestamp.difference(startedAt).inSeconds;
+            breakStartedAt = null;
+          }
+        case AttendanceTimelogType.clockOut:
+          final startedAt = breakStartedAt;
+          if (startedAt != null) {
+            completedBreak += timelog.timestamp.difference(startedAt).inSeconds;
+            breakStartedAt = null;
+          }
+        case AttendanceTimelogType.clockIn:
+          break;
+      }
+    }
+    final currentBreak =
+        state == AttendanceState.onBreak && breakStartedAt != null
+        ? now.difference(breakStartedAt).inSeconds
+        : 0;
+    return (
+      clockedIn: clockedIn < 0 ? 0 : clockedIn,
+      completedBreak: completedBreak < 0 ? 0 : completedBreak,
+      currentBreak: currentBreak < 0 ? 0 : currentBreak,
     );
   }
 }
@@ -239,7 +384,14 @@ class SmartTimeLogApiClient {
     _accessToken = null;
     _currentEmployee = null;
     try {
-      await _sessionStorage?.deleteAll();
+      final storage = _sessionStorage;
+      if (storage != null) {
+        await Future.wait([
+          storage.delete(_tokenKey),
+          storage.delete(_expiresAtKey),
+          storage.delete(_employeeKey),
+        ]);
+      }
     } on Object {
       // In-memory logout must still succeed if secure storage is unavailable.
     }

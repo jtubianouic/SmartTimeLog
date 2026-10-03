@@ -126,6 +126,9 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen>
   }
 
   Future<void> _handleTakeBreak() async {
+    final shouldUpdateBreak = await _confirmBreakChange();
+    if (!shouldUpdateBreak || !mounted) return;
+
     setState(() => _isUpdatingBreak = true);
     try {
       final position = await DeviceLocationService.getCurrentPosition();
@@ -170,6 +173,36 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen>
     }
   }
 
+  Future<bool> _confirmBreakChange() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            icon: Icon(
+              _isOnBreak
+                  ? Icons.play_arrow_rounded
+                  : Icons.free_breakfast_outlined,
+            ),
+            title: Text(_isOnBreak ? 'End your break?' : 'Start your break?'),
+            content: Text(
+              _isOnBreak
+                  ? 'Break time will stop and your working time will resume.'
+                  : 'Your working time will pause and break time will start.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(_isOnBreak ? 'Keep break' : 'Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(_isOnBreak ? 'End break' : 'Start break'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   void _handleClockOut() {
     if (!_hasTakenBreak || _isOnBreak) return;
     Navigator.pushReplacement(
@@ -191,16 +224,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen>
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: WorkflowAppBar(
-        title: 'Active shift',
-        step: 3,
-        actions: [
-          Chip(
-            avatar: const Icon(Icons.circle, size: 10),
-            label: Text(_isOnBreak ? 'On break' : 'Clocked in'),
-          ),
-        ],
-      ),
+      appBar: WorkflowAppBar(title: 'Active shift', step: 3),
       body: Column(
         children: [
           Expanded(
@@ -208,7 +232,7 @@ class _ActiveShiftScreenState extends State<ActiveShiftScreen>
               onRefresh: _refreshStatus,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                 children: [
                   Center(
                     child: ConstrainedBox(

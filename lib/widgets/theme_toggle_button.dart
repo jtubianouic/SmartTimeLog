@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
+
+import '../providers/theme_notifier.dart';
 
 class ThemeToggleButton extends StatelessWidget {
   final Color? iconColor;
 
-  const ThemeToggleButton({
-    super.key,
-    this.iconColor,
-  });
+  const ThemeToggleButton({super.key, this.iconColor});
 
   @override
   Widget build(BuildContext context) {

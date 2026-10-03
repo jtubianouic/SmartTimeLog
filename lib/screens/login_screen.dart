@@ -70,22 +70,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(22),
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primaryContainer,
-                          ),
-                          child: Icon(
-                            Icons.schedule_rounded,
-                            size: 36,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimaryContainer,
-                          ),
+                        Image.asset(
+                          'lib/icons/smarttimelog.png',
+                          width: 112,
+                          height: 112,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'SmartTimeLog logo',
                         ),
                         const SizedBox(height: 24.0),
                         Text(

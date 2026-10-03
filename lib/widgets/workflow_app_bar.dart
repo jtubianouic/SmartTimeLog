@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/smart_time_log_api.dart';
+import 'theme_toggle_button.dart';
 
 class WorkflowAppBar extends StatelessWidget implements PreferredSizeWidget {
   const WorkflowAppBar({
@@ -39,6 +40,12 @@ class WorkflowAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         ...actions,
+        const ThemeToggleButton(),
+        IconButton(
+          onPressed: () => Navigator.pushNamed(context, '/history'),
+          tooltip: 'Attendance history',
+          icon: const Icon(Icons.history_rounded),
+        ),
         IconButton(
           onPressed: () => _confirmLogout(context),
           tooltip: 'Log out',

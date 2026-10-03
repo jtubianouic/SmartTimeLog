@@ -3,14 +3,85 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/device_location_service.dart';
+import '../services/onboarding_service.dart';
 import '../services/smart_time_log_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/onboarding_walkthrough.dart';
 import '../widgets/workflow_app_bar.dart';
+import 'session_gate.dart';
+
+bool hasClockInStateConflict(AttendanceStatus status) =>
+    status.state == AttendanceState.onBreak ||
+    status.state == AttendanceState.clockedIn;
+
+class ClockInStateConflictDialog extends StatelessWidget {
+  const ClockInStateConflictDialog({super.key, required this.isOnBreak});
+
+  final bool isOnBreak;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: Icon(
+        isOnBreak ? Icons.free_breakfast_outlined : Icons.lock_clock_outlined,
+      ),
+      title: Text(isOnBreak ? 'Break already active' : 'Shift already active'),
+      content: Text(
+        isOnBreak
+            ? 'A break is currently in progress. Clocking in again could '
+                  'create an invalid attendance state. Return to your '
+                  'active shift instead?'
+            : 'You are already clocked in. Return to your active shift '
+                  'instead of creating another clock-in?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Stay here'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Return to shift'),
+        ),
+      ],
+    );
+  }
+}
+
+class ClockInConfirmationDialog extends StatelessWidget {
+  const ClockInConfirmationDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.login_rounded),
+      title: const Text('Clock in now?'),
+      content: const Text(
+        'Your current location and clock-in time will be recorded.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Clock in'),
+        ),
+      ],
+    );
+  }
+}
 
 class GeofenceClockInScreen extends StatefulWidget {
-  const GeofenceClockInScreen({super.key, this.headquarters});
+  const GeofenceClockInScreen({
+    super.key,
+    this.headquarters,
+    this.onboardingService,
+  });
 
   final Headquarters? headquarters;
+  final OnboardingService? onboardingService;
 
   @override
   State<GeofenceClockInScreen> createState() => _GeofenceClockInScreenState();
@@ -34,7 +105,10 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
   void initState() {
     super.initState();
     if (widget.headquarters != null) {
-      _refreshLocation();
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _showOnboarding();
+        if (mounted) await _refreshLocation();
+      });
     }
   }
 
@@ -106,6 +180,22 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
   Future<void> _handleClockIn() async {
     setState(() => _isClockingIn = true);
     try {
+      final status = await SmartTimeLogApi.instance.getAttendanceStatus();
+      if (hasClockInStateConflict(status)) {
+        final returnToShift = await _confirmExistingShift(status);
+        if (returnToShift && mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => SessionGate.destinationFor(status),
+            ),
+          );
+        }
+        return;
+      }
+      final shouldClockIn = await _confirmClockIn();
+      if (!shouldClockIn || !mounted) return;
+
       final position = await _refreshLocation();
       if (position == null) {
         return;
@@ -138,6 +228,55 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
         setState(() => _isClockingIn = false);
       }
     }
+  }
+
+  Future<void> _showOnboarding() async {
+    final service = widget.onboardingService ?? OnboardingService.instance;
+    var shouldShow = true;
+    try {
+      shouldShow = await service.shouldShow();
+    } on OnboardingException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+    if (!shouldShow || !mounted) return;
+
+    final completed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const OnboardingWalkthrough(),
+    );
+    if (completed != true) return;
+    try {
+      await service.markCompleted();
+    } on OnboardingException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
+
+  Future<bool> _confirmExistingShift(AttendanceStatus status) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (_) => ClockInStateConflictDialog(
+            isOnBreak: status.state == AttendanceState.onBreak,
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> _confirmClockIn() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (_) => const ClockInConfirmationDialog(),
+        ) ??
+        false;
   }
 
   Future<bool> _confirmOutsideGeofence() async {
@@ -179,22 +318,12 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: WorkflowAppBar(
-        title: 'Geofence clock-in',
-        step: 2,
-        actions: [
-          IconButton(
-            onPressed: _isLocating ? null : _refreshLocation,
-            tooltip: 'Refresh location',
-            icon: const Icon(Icons.my_location_rounded),
-          ),
-        ],
-      ),
+      appBar: WorkflowAppBar(title: 'Geofence clock-in', step: 2),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
               child: Column(
                 children: [
                   if (widget.headquarters == null)
@@ -359,7 +488,7 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: SafeArea(
               top: false,
-              minimum: const EdgeInsets.all(16),
+              minimum: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -508,6 +637,21 @@ class _GeofenceClockInScreenState extends State<GeofenceClockInScreen> {
                   ],
                 ),
               ],
+            ),
+            Positioned(
+              right: 12,
+              top: 12,
+              child: Material(
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.94),
+                shape: const CircleBorder(),
+                child: IconButton(
+                  onPressed: _isLocating ? null : _refreshLocation,
+                  tooltip: 'Refresh location',
+                  icon: const Icon(Icons.my_location_rounded),
+                ),
+              ),
             ),
             Positioned(
               left: 12,

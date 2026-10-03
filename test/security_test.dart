@@ -87,6 +87,9 @@ class _MemorySessionStorage implements SessionStorage {
   final Map<String, String> values = {};
 
   @override
+  Future<void> delete(String key) async => values.remove(key);
+
+  @override
   Future<void> deleteAll() async => values.clear();
 
   @override

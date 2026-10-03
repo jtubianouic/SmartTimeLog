@@ -110,16 +110,7 @@ class _AISummaryScreenState extends State<AISummaryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const WorkflowAppBar(
-        title: 'Review summary',
-        step: 5,
-        actions: [
-          Chip(
-            avatar: Icon(Icons.auto_awesome_rounded, size: 16),
-            label: Text('AI generated'),
-          ),
-        ],
-      ),
+      appBar: const WorkflowAppBar(title: 'Review summary', step: 5),
       body: Column(
         children: [
           Expanded(

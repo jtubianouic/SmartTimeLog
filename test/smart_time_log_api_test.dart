@@ -59,6 +59,16 @@ void main() {
               'long': 125.6128,
               'timestamp': '2026-09-02T08:00:00Z',
             },
+            'timelogs': [
+              {
+                'timelog_id': 9,
+                'employee_id': 42,
+                'log_type': 'clock_in',
+                'lat': 7.0731,
+                'long': 125.6128,
+                'timestamp': '2026-09-02T08:00:00Z',
+              },
+            ],
           }),
           200,
         );
@@ -99,7 +109,9 @@ void main() {
     expect(status.breakDurationSeconds, 900);
     expect(status.currentBreakDurationSeconds, 0);
     expect(status.hasTakenBreak, isTrue);
-    expect(status.latestTimelog?['timelog_id'], 9);
+    expect(status.latestTimelog?.id, 9);
+    expect(status.timelogs, hasLength(1));
+    expect(status.timelogs.single.type, AttendanceTimelogType.clockIn);
     expect(storage.values['access_token'], 'test-token');
     expect(requests.map((request) => request.url.path), [
       '/api/mobile/login',
@@ -148,7 +160,8 @@ void main() {
           'firstName': null,
           'lastName': null,
           'headquarters': null,
-        });
+        })
+        ..values['attendance_ledger'] = 'saved-history';
       final api = SmartTimeLogApiClient(
         baseUrl: 'https://example.com',
         sessionStorage: storage,
@@ -167,7 +180,7 @@ void main() {
         throwsA(isA<ApiException>()),
       );
       expect(api.hasSession, isFalse);
-      expect(storage.values, isEmpty);
+      expect(storage.values, {'attendance_ledger': 'saved-history'});
     },
   );
 
@@ -228,10 +241,46 @@ void main() {
       'clockedInDurationSeconds': 60,
       'breakDurationSeconds': 0,
       'currentBreakDurationSeconds': 0,
-      'latestTimelog': {'log_type': 'break_end'},
+      'latestTimelog': {
+        'timelog_id': 2,
+        'employee_id': 42,
+        'log_type': 'break_end',
+        'lat': null,
+        'long': null,
+        'timestamp': '2026-09-02T08:30:00Z',
+      },
     });
 
     expect(status.hasTakenBreak, isTrue);
+  });
+
+  test('parses the latest status payload and derives shift durations', () {
+    final status = AttendanceStatus.fromJson({
+      'ok': true,
+      'status': 'clocked_in',
+      'latestTimelog': <String, dynamic>{},
+      'timelogs': [
+        {
+          'timelog_id': 123,
+          'employee_id': 5,
+          'log_type': 'clock_in',
+          'lat': 7.0731,
+          'long': 125.6128,
+          'timestamp': DateTime.now()
+              .toUtc()
+              .subtract(const Duration(minutes: 5))
+              .toIso8601String(),
+        },
+      ],
+    });
+
+    expect(status.state, AttendanceState.clockedIn);
+    expect(status.latestTimelog, isNull);
+    expect(status.timelogs.single.id, 123);
+    expect(status.timelogs.single.employeeId, 5);
+    expect(status.timelogs.single.latitude, 7.0731);
+    expect(status.timelogs.single.longitude, 125.6128);
+    expect(status.clockedInDurationSeconds, greaterThanOrEqualTo(299));
   });
 
   test('times out when the response body never completes', () async {
@@ -275,6 +324,9 @@ void main() {
 
 class _MemorySessionStorage implements SessionStorage {
   final Map<String, String> values = {};
+
+  @override
+  Future<void> delete(String key) async => values.remove(key);
 
   @override
   Future<void> deleteAll() async => values.clear();

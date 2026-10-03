@@ -8,6 +8,7 @@ import 'screens/geofence_clockin_screen.dart';
 import 'screens/active_shift_screen.dart';
 import 'screens/clockout_screen.dart';
 import 'screens/ai_summary_screen.dart';
+import 'screens/attendance_history_screen.dart';
 import 'screens/session_gate.dart';
 
 Future<void> main() async {
@@ -21,8 +22,6 @@ Future<void> main() async {
 
   runApp(const MyApp());
 }
-
-final themeNotifier = ThemeNotifier();
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key, this.home = const SessionGate()});
@@ -47,6 +46,7 @@ class MyApp extends StatelessWidget {
             '/active-shift': (context) => const ActiveShiftScreen(),
             '/clockout': (context) => const ClockOutScreen(),
             '/summary': (context) => const AISummaryScreen(),
+            '/history': (context) => const AttendanceHistoryScreen(),
           },
         );
       },

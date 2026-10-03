@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 abstract class SessionStorage {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
+  Future<void> delete(String key);
   Future<void> deleteAll();
 }
 
@@ -19,6 +20,10 @@ class SecureSessionStorage implements SessionStorage {
   @override
   Future<void> write(String key, String value) =>
       _storage.write(key: key, value: value).timeout(_operationTimeout);
+
+  @override
+  Future<void> delete(String key) =>
+      _storage.delete(key: key).timeout(_operationTimeout);
 
   @override
   Future<void> deleteAll() => _storage.deleteAll().timeout(_operationTimeout);
