@@ -66,7 +66,7 @@ to the login screen.
 4. Set the backend URL in `.env`:
 
    ```dotenv
-   BASE_URL=https://your-smarttimelog-api.example.com
+   BASE_URL=https://smarttimelog-admin.vercel.app
    ```
 
 5. Start an emulator, connect a device, and run the app:
