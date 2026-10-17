@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../services/smart_time_log_api.dart';
 import '../services/registration_qr_decoder.dart';
+import '../widgets/theme_toggle_button.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -19,6 +20,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _lastName = TextEditingController();
   final _username = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   String? _registrationToken;
   DateTime? _currentQrExpiresAt;
   List<RegistrationHeadquarters> _headquarters = const [];
@@ -26,6 +28,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String? _error;
   bool _busy = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _lastScannedToken;
 
   bool get _canScan =>
@@ -40,6 +43,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _lastName.dispose();
     _username.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -123,6 +127,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (mounted) {
         setState(() => _error = 'The server returned an unreadable QR image.');
       }
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error = 'Unable to verify the QR code. Please try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -130,6 +140,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _submit() async {
     if (_busy || !_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     final token = _registrationToken;
     final headquartersId = _headquartersId;
     if (token == null || headquartersId == null) return;
@@ -170,6 +181,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           if (error.statusCode == 401) _registrationToken = null;
         });
       }
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error = 'Unable to submit registration. Please try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -182,11 +199,277 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return null;
   }
 
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
+  }
+
+  Widget _errorNotice(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.errorContainer,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.error.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline_rounded, color: colors.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _registrationToken == null
+                        ? 'Check your QR code'
+                        : 'Registration could not be submitted',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: colors.onErrorContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _error!,
+                    style: TextStyle(color: colors.onErrorContainer),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegistrationForm(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: AutofillGroup(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your details',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Use the name and account details you want your administrator to review.',
+                  style: TextStyle(color: colors.onSurfaceVariant),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _firstName,
+                  onChanged: (_) => _clearError(),
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.givenName],
+                  decoration: const InputDecoration(
+                    labelText: 'First name',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                  validator: _requiredName,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _lastName,
+                  onChanged: (_) => _clearError(),
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.familyName],
+                  decoration: const InputDecoration(
+                    labelText: 'Last name',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                  validator: _requiredName,
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<int>(
+                  initialValue: _headquartersId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Headquarters',
+                    prefixIcon: const Icon(Icons.business_outlined),
+                    helperText: _headquarters.isEmpty
+                        ? 'No active headquarters are available.'
+                        : 'Select your assigned headquarters.',
+                  ),
+                  items: _headquarters
+                      .map(
+                        (hq) => DropdownMenuItem(
+                          value: hq.id,
+                          child: Text(
+                            hq.name?.isNotEmpty == true
+                                ? hq.name!
+                                : 'HQ ${hq.id}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _busy || _headquarters.isEmpty
+                      ? null
+                      : (value) => setState(() {
+                          _headquartersId = value;
+                          _error = null;
+                        }),
+                  validator: (value) =>
+                      value == null ? 'Select a headquarters' : null,
+                ),
+                const SizedBox(height: 28),
+                Divider(color: colors.outlineVariant),
+                const SizedBox(height: 20),
+                Text(
+                  'Account security',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _username,
+                  onChanged: (_) => _clearError(),
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.newUsername],
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  ),
+                  validator: (value) {
+                    final length = value?.trim().length ?? 0;
+                    if (length < 3) return 'Use at least 3 characters';
+                    if (length > 80) return 'Use 80 characters or fewer';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _password,
+                  onChanged: (_) => _clearError(),
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    helperText: 'Use 8 to 128 characters.',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      tooltip: _obscurePassword
+                          ? 'Show password'
+                          : 'Hide password',
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  validator: (value) {
+                    final length = value?.length ?? 0;
+                    if (length < 8) return 'Use at least 8 characters';
+                    if (length > 128) return 'Use 128 characters or fewer';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _confirmPassword,
+                  onChanged: (_) => _clearError(),
+                  obscureText: _obscureConfirmPassword,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: 'Confirm password',
+                    prefixIcon: const Icon(Icons.lock_reset_outlined),
+                    suffixIcon: IconButton(
+                      tooltip: _obscureConfirmPassword
+                          ? 'Show confirm password'
+                          : 'Hide confirm password',
+                      icon: Icon(
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: () => setState(
+                        () =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword,
+                      ),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Confirm your password';
+                    }
+                    if (value != _password.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 20),
+                  _errorNotice(context),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton.icon(
+                    onPressed: _busy || _headquarters.isEmpty ? null : _submit,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : const Icon(Icons.person_add_alt_1_rounded),
+                    label: Text(
+                      _busy ? 'Submitting request...' : 'Request registration',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'An administrator must approve your account before you can sign in.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
+      appBar: AppBar(
+        title: const Text('Register'),
+        actions: [
+          ThemeToggleButton(iconColor: colorScheme.primary),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -293,14 +576,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   label: const Text('Scan another QR code'),
                 ),
               ],
-              if (_busy) const LinearProgressIndicator(),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-                if (_registrationToken == null && _lastScannedToken != null)
+              if (_busy) ...[
+                const SizedBox(height: 16),
+                const LinearProgressIndicator(),
+              ],
+              if (_registrationToken == null && _error != null) ...[
+                const SizedBox(height: 16),
+                _errorNotice(context),
+                if (_lastScannedToken != null)
                   TextButton(
                     onPressed: _busy
                         ? null
@@ -310,103 +593,33 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ],
               if (_registrationToken != null) ...[
                 const SizedBox(height: 16),
-                const Text(
-                  'Current QR verified. The server will check it again when you submit.',
-                ),
-                const SizedBox(height: 16),
-                Form(
-                  key: _formKey,
-                  child: Column(
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
                     children: [
-                      TextFormField(
-                        controller: _firstName,
-                        decoration: const InputDecoration(
-                          labelText: 'First name',
-                        ),
-                        validator: _requiredName,
+                      Icon(
+                        Icons.verified_rounded,
+                        color: colorScheme.onPrimaryContainer,
                       ),
-                      TextFormField(
-                        controller: _lastName,
-                        decoration: const InputDecoration(
-                          labelText: 'Last name',
-                        ),
-                        validator: _requiredName,
-                      ),
-                      TextFormField(
-                        controller: _username,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                        ),
-                        validator: (value) {
-                          final length = value?.trim().length ?? 0;
-                          if (length < 3) return 'Use at least 3 characters';
-                          if (length > 80) return 'Use 80 characters or fewer';
-                          return null;
-                        },
-                      ),
-                      TextFormField(
-                        controller: _password,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePassword
-                                ? 'Show password'
-                                : 'Hide password',
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword,
-                            ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'QR code verified. Complete the form below.',
+                          style: TextStyle(
+                            color: colorScheme.onPrimaryContainer,
                           ),
-                        ),
-                        validator: (value) {
-                          final length = value?.length ?? 0;
-                          if (length < 8) return 'Use at least 8 characters';
-                          if (length > 128) {
-                            return 'Use 128 characters or fewer';
-                          }
-                          return null;
-                        },
-                      ),
-                      DropdownButtonFormField<int>(
-                        initialValue: _headquartersId,
-                        decoration: const InputDecoration(
-                          labelText: 'Headquarters',
-                        ),
-                        items: _headquarters
-                            .map(
-                              (hq) => DropdownMenuItem(
-                                value: hq.id,
-                                child: Text(
-                                  hq.name?.isNotEmpty == true
-                                      ? hq.name!
-                                      : 'HQ ${hq.id}',
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _busy
-                            ? null
-                            : (value) =>
-                                  setState(() => _headquartersId = value),
-                        validator: (value) =>
-                            value == null ? 'Select a headquarters' : null,
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _busy ? null : _submit,
-                          child: const Text('Request registration'),
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                _buildRegistrationForm(context),
               ],
             ],
           ),
