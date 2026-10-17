@@ -98,6 +98,19 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Passwords do not match'), findsOneWidget);
         expect(registrationRequests, 0);
+        final darkTheme = Theme.of(
+          tester.element(find.byType(RegistrationScreen)),
+        );
+        final darkErrorBorder =
+            darkTheme.inputDecorationTheme.errorBorder! as OutlineInputBorder;
+        final darkFocusedErrorBorder =
+            darkTheme.inputDecorationTheme.focusedErrorBorder!
+                as OutlineInputBorder;
+        expect(darkErrorBorder.borderSide.color, darkTheme.colorScheme.error);
+        expect(
+          darkFocusedErrorBorder.borderSide.color,
+          darkTheme.colorScheme.error,
+        );
 
         await tester.enterText(
           find.widgetWithText(TextFormField, 'Confirm password'),
@@ -142,6 +155,12 @@ void main() {
           Theme.of(tester.element(find.byType(RegistrationScreen))).brightness,
           Brightness.light,
         );
+        final lightTheme = Theme.of(
+          tester.element(find.byType(RegistrationScreen)),
+        );
+        final lightErrorBorder =
+            lightTheme.inputDecorationTheme.errorBorder! as OutlineInputBorder;
+        expect(lightErrorBorder.borderSide.color, lightTheme.colorScheme.error);
         await tester.pumpWidget(const SizedBox.shrink());
       } finally {
         MobileScannerPlatform.instance = originalPlatform;
