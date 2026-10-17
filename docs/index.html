@@ -11,13 +11,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="window.renderDownloadQr && window.renderDownloadQr()" onerror="window.showQrFallback && window.showQrFallback()"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; }
-    body { overflow: hidden; background: #07131e; color: #f6fbff; font-family: "DM Sans", sans-serif; }
+    body { overflow: hidden; background: #07131e; color: #f6fbff; font-family: "DM Sans", sans-serif; -webkit-font-smoothing: antialiased; }
     .page { position: relative; isolation: isolate; display: flex; flex-direction: column; width: 100%; height: 100svh; overflow: hidden; background: radial-gradient(circle at 77% 36%, rgba(30,147,207,.24), transparent 33%), radial-gradient(circle at 20% 83%, rgba(45,211,175,.11), transparent 37%), #07131e; }
     .page::before { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(136,205,231,.04) 1px, transparent 1px), linear-gradient(90deg,rgba(136,205,231,.04) 1px,transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(to bottom,#000,transparent 92%); }
     .header { display: flex; flex: none; align-items: center; justify-content: space-between; width: min(100% - 48px,1120px); margin-inline: auto; padding-block: 22px 8px; }
@@ -34,8 +33,9 @@
     .intro { max-width: 460px; margin: 0; color: #b2c4d2; font-size: clamp(14px,1.4vw,16px); line-height: 1.65; }
     .download { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; margin-top: 27px; padding: 0 24px; border-radius: 15px; background: linear-gradient(110deg,#99efd9,#89caff); box-shadow: 0 13px 30px rgba(75,197,207,.21); color: #092631; font-size: 14px; font-weight: 800; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
     .download:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(75,197,207,.34); }
-    .download:focus-visible,.brand:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+    .download:focus-visible,.brand:focus-visible,.release-link:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
     .version { margin: 12px 0 0; color: #8099aa; font-size: 12px; }
+    .release-link { display: inline-block; margin-top: 10px; color: #a9dfff; font-size: 12px; text-underline-offset: 3px; }
     .qr-panel { display: flex; flex-direction: column; align-items: center; width: 226px; padding: 17px 17px 18px; border: 1px solid rgba(255,255,255,.14); border-radius: 25px; background: rgba(255,255,255,.07); text-align: center; }
     .qr-shell { padding: 12px; border-radius: 15px; background: #fff; }
     .qr-frame { position: relative; width: 176px; height: 176px; }
@@ -92,7 +92,7 @@
     @media (prefers-reduced-motion: reduce) { .download { transition: none; } }
   </style>
 </head>
-<body class="antialiased">
+<body>
   <div class="page">
     <header class="header">
       <a class="brand" href="#" aria-label="SmartTimeLog home">
@@ -107,11 +107,12 @@
           <span class="eyebrow">Your workday, made simple</span>
           <h1 id="download-heading">Time well spent.<br><span class="gradient-text">Simply tracked.</span></h1>
           <p class="intro">Clock in, track your shift, and keep your attendance close at hand.</p>
-          <a id="download-link" class="download" href="https://github.com/jtubianouic/SmartTimeLog/releases/latest/download/app-release.apk" download>
+          <a id="download-link" class="download" href="https://github.com/jtubianouic/SmartTimeLog/releases/latest/download/app-release.apk">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Download for Android
           </a>
           <p class="version">Android APK &middot; Latest release</p>
+          <a class="release-link" href="https://github.com/jtubianouic/SmartTimeLog/releases/latest">Having trouble? View the release</a>
         </div>
         <div class="qr-panel">
           <div class="qr-shell"><div class="qr-frame"><div id="qrcode" role="img" aria-label="QR code linking to the SmartTimeLog Android APK"></div><span class="qr-logo" hidden aria-hidden="true"><img data-smarttimelog-icon alt="" width="32" height="32"></span></div></div>
@@ -126,20 +127,26 @@
     document.querySelectorAll('[data-smarttimelog-icon]').forEach(function (image) {
       image.src = iconUrl;
     });
-    window.addEventListener('load', function () {
+    window.showQrFallback = function () {
       const target = document.getElementById('qrcode');
-      if (typeof QRCode === 'undefined') {
-        target.classList.add('qr-error');
-        target.textContent = 'Use the download button to get the app.';
-        return;
-      }
+      if (!target || target.querySelector('canvas, img')) return;
+      target.classList.add('qr-error');
+      target.textContent = 'Use the download button to get the app.';
+    };
+    window.renderDownloadQr = function () {
+      const target = document.getElementById('qrcode');
+      if (!target || typeof QRCode === 'undefined' || target.querySelector('canvas, img')) return;
+      target.classList.remove('qr-error');
+      target.replaceChildren();
       new QRCode(target, {
         text: document.getElementById('download-link').href,
         width: 176, height: 176, colorDark: '#0b1b29', colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
       });
       document.querySelector('.qr-logo').hidden = false;
-    });
+    };
+    if (typeof QRCode !== 'undefined') window.renderDownloadQr();
+    else window.setTimeout(window.showQrFallback, 8000);
   </script>
 </body>
 </html>
