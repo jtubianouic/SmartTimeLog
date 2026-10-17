@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'session_gate.dart';
+import 'registration_screen.dart';
 import '../services/smart_time_log_api.dart';
 import '../widgets/theme_toggle_button.dart';
 
@@ -154,10 +155,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   )
                                 : const Icon(Icons.login_rounded),
-                              label: Text(
-                                _isLoading ? 'Logging in...' : 'Log In',
+                            label: Text(
+                              _isLoading ? 'Logging in...' : 'Log In',
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const RegistrationScreen(),
+                                  ),
+                                ),
+                          child: const Text('Register with QR code'),
                         ),
                       ],
                     ),

@@ -14,6 +14,29 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+class RegistrationHeadquarters {
+  const RegistrationHeadquarters({required this.id, required this.name});
+
+  final int id;
+  final String? name;
+
+  factory RegistrationHeadquarters.fromJson(Map<String, dynamic> json) {
+    final id = json['hq_id'];
+    final name = json['hq_name'];
+    if (id is! int || id < 1 || (name != null && name is! String)) {
+      throw const FormatException('Invalid headquarters option.');
+    }
+    return RegistrationHeadquarters(id: id, name: name as String?);
+  }
+}
+
+class CurrentRegistrationQr {
+  const CurrentRegistrationQr({required this.dataUrl, required this.expiresAt});
+
+  final String dataUrl;
+  final DateTime expiresAt;
+}
+
 class Headquarters {
   const Headquarters({
     required this.id,
@@ -187,17 +210,23 @@ class AttendanceStatus {
   final AttendanceTimelog? latestTimelog;
   final List<AttendanceTimelog> timelogs;
 
-  bool get hasTakenBreak =>
-      state == AttendanceState.onBreak ||
-      breakDurationSeconds > 0 ||
-      currentBreakDurationSeconds > 0 ||
-      latestTimelog?.type == AttendanceTimelogType.breakStart ||
-      latestTimelog?.type == AttendanceTimelogType.breakEnd ||
-      timelogs.any(
-        (timelog) =>
-            timelog.type == AttendanceTimelogType.breakStart ||
-            timelog.type == AttendanceTimelogType.breakEnd,
-      );
+  bool get hasTakenBreak {
+    if (state == AttendanceState.onBreak) return true;
+    if (timelogs.isEmpty) {
+      return latestTimelog?.type == AttendanceTimelogType.breakEnd;
+    }
+
+    final newestFirst = [...timelogs]
+      ..sort((a, b) {
+        final byTime = b.timestamp.compareTo(a.timestamp);
+        return byTime != 0 ? byTime : b.id.compareTo(a.id);
+      });
+    for (final timelog in newestFirst) {
+      if (timelog.type == AttendanceTimelogType.clockIn) return false;
+      if (timelog.type == AttendanceTimelogType.breakEnd) return true;
+    }
+    return false;
+  }
 
   factory AttendanceStatus.fromJson(Map<String, dynamic> json) {
     final status = json['status'];
@@ -449,6 +478,74 @@ class SmartTimeLogApiClient {
     }
   }
 
+  Future<List<RegistrationHeadquarters>> getRegistrationHeadquarters() async {
+    final response = await _requestJson(
+      'GET',
+      '/api/mobile/headquarters',
+      authenticated: false,
+    );
+    if (response is! List) {
+      throw const ApiException(
+        'The server returned an invalid headquarters list.',
+      );
+    }
+    try {
+      return response
+          .map((entry) {
+            if (entry is! Map<String, dynamic>) {
+              throw const FormatException('Invalid headquarters option.');
+            }
+            return RegistrationHeadquarters.fromJson(entry);
+          })
+          .toList(growable: false);
+    } on FormatException {
+      throw const ApiException(
+        'The server returned an invalid headquarters list.',
+      );
+    }
+  }
+
+  Future<CurrentRegistrationQr> getCurrentRegistrationQr() async {
+    final response = await _request(
+      'GET',
+      '/api/admin/registration-qr',
+      authenticated: false,
+    );
+    final expiresAt = DateTime.tryParse(response['expiresAt'] as String? ?? '');
+    final dataUrl = response['qrCode'];
+    if (dataUrl is! String || expiresAt == null) {
+      throw const ApiException('The server returned an invalid QR expiry.');
+    }
+    return CurrentRegistrationQr(dataUrl: dataUrl, expiresAt: expiresAt);
+  }
+
+  Future<void> register({
+    required String registrationToken,
+    required String firstName,
+    required String lastName,
+    required String username,
+    required String password,
+    required int headquartersId,
+  }) async {
+    final response = await _post(
+      '/api/mobile/register',
+      authenticated: false,
+      body: {
+        'registrationToken': registrationToken,
+        'firstName': firstName,
+        'lastName': lastName,
+        'username': username,
+        'plainPassword': password,
+        'headquartersId': headquartersId,
+      },
+    );
+    if (response['ok'] != true || response['isPending'] != true) {
+      throw const ApiException(
+        'The server returned an invalid registration response.',
+      );
+    }
+  }
+
   Future<AttendanceStatus> getAttendanceStatus() async {
     final response = await _request('GET', '/api/mobile/status');
     try {
@@ -535,6 +632,24 @@ class SmartTimeLogApiClient {
     Map<String, dynamic>? body,
     bool authenticated = true,
   }) async {
+    final decoded = await _requestJson(
+      method,
+      path,
+      body: body,
+      authenticated: authenticated,
+    );
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('The server returned an invalid response.');
+    }
+    return decoded;
+  }
+
+  Future<dynamic> _requestJson(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    bool authenticated = true,
+  }) async {
     if (authenticated && _accessToken == null) {
       throw const ApiException('Please log in again.');
     }
@@ -566,9 +681,6 @@ class SmartTimeLogApiClient {
           message ?? 'Request failed (${response.statusCode}).',
           statusCode: response.statusCode,
         );
-      }
-      if (decoded is! Map<String, dynamic>) {
-        throw const ApiException('The server returned an invalid response.');
       }
       return decoded;
     } on TimeoutException {

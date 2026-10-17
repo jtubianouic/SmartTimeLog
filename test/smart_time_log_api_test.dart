@@ -108,7 +108,7 @@ void main() {
     expect(status.clockedInDurationSeconds, 3600);
     expect(status.breakDurationSeconds, 900);
     expect(status.currentBreakDurationSeconds, 0);
-    expect(status.hasTakenBreak, isTrue);
+    expect(status.hasTakenBreak, isFalse);
     expect(status.latestTimelog?.id, 9);
     expect(status.timelogs, hasLength(1));
     expect(status.timelogs.single.type, AttendanceTimelogType.clockIn);
@@ -163,7 +163,7 @@ void main() {
         })
         ..values['attendance_ledger'] = 'saved-history';
       final api = SmartTimeLogApiClient(
-        baseUrl: 'https://example.com',
+        baseUrl: 'https://smarttimelog-admin.vercel.app',
         sessionStorage: storage,
         client: MockClient(
           (request) async => http.Response(
@@ -199,7 +199,7 @@ void main() {
         'headquarters': null,
       });
     final api = SmartTimeLogApiClient(
-      baseUrl: 'https://example.com',
+      baseUrl: 'https://smarttimelog-admin.vercel.app',
       sessionStorage: storage,
     );
 
@@ -211,7 +211,7 @@ void main() {
 
   test('surfaces the backend error message', () async {
     final api = SmartTimeLogApiClient(
-      baseUrl: 'https://example.com',
+      baseUrl: 'https://smarttimelog-admin.vercel.app',
       client: MockClient(
         (_) async => http.Response(
           jsonEncode({'ok': false, 'message': 'Invalid credentials.'}),
@@ -285,7 +285,7 @@ void main() {
 
   test('times out when the response body never completes', () async {
     final api = SmartTimeLogApiClient(
-      baseUrl: 'https://example.com',
+      baseUrl: 'https://smarttimelog-admin.vercel.app',
       client: _NeverCompletingClient(),
       requestTimeout: const Duration(milliseconds: 10),
     );
